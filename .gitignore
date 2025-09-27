@@ -1,0 +1,6 @@
+_pycache_/
+*.pyc
+venv/
+instance/*.db
+.env
+user_scores.csv
