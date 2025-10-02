@@ -1,41 +1,116 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="row">
-  <div class="col-md-8">
-    <h3>Welcome, {{ current_user.name }}</h3>
-    <p>Enter your marks / skill levels (0-100):</p>
-    <form method="post">
-      <div class="row g-2">
-        <div class="col-md-4"><label>DSA</label><input name="dsa" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>DBMS</label><input name="dbms" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>OS</label><input name="os" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>CN</label><input name="cn" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>Mathmetics</label><input name="math" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>Aptitude</label><input name="aptitude" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>Comm</label><input name="comm" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>Problem Solving</label><input name="problem_solving" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>Creative</label><input name="creative" class="form-control" type="number" min="0" max="100"></div>
-        <div class="col-md-4"><label>Hackathons</label><input name="hackathons" class="form-control" type="number" min="0" max="100"></div>
-      </div>
-      <button type="submit" class="btn btn-success mt-3">Save & Predict</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Career Guidance</title>
+  <style>
+    /* Reset some default styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+    }
+
+    .container {
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 25px;
+    }
+
+    form label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    form input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    form input[type="number"]:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #007bff;
+      color: #fff;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Welcome, {{ user.name }}</h2>
+    <form action="/submit_scores" method="POST">
+      <label>DSA:</label>
+      <input type="number" name="dsa" required>
+
+      <label>DBMS:</label>
+      <input type="number" name="dbms" required>
+
+      <label>OS:</label>
+      <input type="number" name="os" required>
+
+      <label>CN:</label>
+      <input type="number" name="cn" required>
+
+      <label>Math:</label>
+      <input type="number" name="math" required>
+
+      <label>Aptitude:</label>
+      <input type="number" name="aptitude" required>
+
+      <label>Communication:</label>
+      <input type="number" name="comm" required>
+
+      <label>Problem Solving:</label>
+      <input type="number" name="problem_solving" required>
+
+      <label>Creative:</label>
+      <input type="number" name="creative" required>
+
+      <label>Hackathons:</label>
+      <input type="number" name="hackathons" required>
+
+      <button type="submit">Submit & Get Recommendations</button>
     </form>
-
-    {% if predicted %}
-      <div class="mt-4">
-        <h5>Predicted top job roles:</h5>
-        <ul>
-          {% for p in predicted %}
-            <li>{{ p }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
   </div>
-
-  <div class="col-md-4">
-    <h5>Quick Actions</h5>
-    <a class="btn btn-primary w-100 mb-2" href="{{ url_for('chat') }}">Open Chat</a>
-    <p class="text-muted small">Ask: "Tell me about Data Scientist" or "How to become Data Scientist" etc.</p>
-  </div>
-</div>
-{% endblock %}
+</body>
+</html>

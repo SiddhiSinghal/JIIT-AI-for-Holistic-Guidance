@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat with Career Assistant</title>
+  <title>Career Assistant Chat</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -11,7 +11,6 @@
       margin: 0;
       padding: 0;
     }
-
     .chat-container {
       max-width: 800px;
       margin: 40px auto;
@@ -20,7 +19,6 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.1);
       padding: 20px;
     }
-
     .chat-header {
       text-align: center;
       font-size: 22px;
@@ -28,7 +26,6 @@
       margin-bottom: 15px;
       color: #4f46e5;
     }
-
     #chat-box {
       height: 400px;
       overflow-y: auto;
@@ -38,7 +35,6 @@
       background: #f9fafb;
       margin-bottom: 15px;
     }
-
     .chat-message {
       margin: 10px 0;
       padding: 10px 15px;
@@ -46,7 +42,6 @@
       display: inline-block;
       max-width: 70%;
     }
-
     .chat-message.user {
       background: #4f46e5;
       color: white;
@@ -54,7 +49,6 @@
       text-align: right;
       display: block;
     }
-
     .chat-message.bot {
       background: #e5e7eb;
       color: black;
@@ -62,12 +56,10 @@
       text-align: left;
       display: block;
     }
-
     .chat-form {
       display: flex;
       gap: 10px;
     }
-
     #user-input {
       flex: 1;
       padding: 12px;
@@ -75,7 +67,6 @@
       border-radius: 12px;
       outline: none;
     }
-
     .send-btn {
       background: #4f46e5;
       color: white;
@@ -85,7 +76,6 @@
       cursor: pointer;
       transition: 0.3s;
     }
-
     .send-btn:hover {
       background: #4338ca;
     }
@@ -94,7 +84,13 @@
 <body>
   <div class="chat-container">
     <div class="chat-header">💬 Chat with Career Assistant</div>
-    <div id="chat-box"></div>
+    <div id="chat-box">
+      {% if initial_message %}
+        <div class="chat-message bot">{{ initial_message|safe }}</div>
+      {% elif welcome_msg %}
+        <div class="chat-message bot">{{ welcome_msg|safe }}</div>
+      {% endif %}
+    </div>
     <form class="chat-form" onsubmit="sendMessage(event)">
       <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off"/>
       <button type="submit" class="send-btn">Send</button>
@@ -106,26 +102,25 @@
       event.preventDefault();
       const input = document.getElementById("user-input");
       const message = input.value.trim();
-      if (!message) return;
+      if(!message) return;
 
-      // Append user message
-      document.getElementById("chat-box").innerHTML += `<div class="chat-message user">${message}</div>`;
-      input.value = "";
-
-      // Scroll to bottom
       const chatBox = document.getElementById("chat-box");
+      // Add user message
+      chatBox.innerHTML += `<div class="chat-message user">${message}</div>`;
+      input.value = "";
       chatBox.scrollTop = chatBox.scrollHeight;
 
-      // Send to backend
+      // Send message to backend
       const res = await fetch("/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message})
       });
 
       const data = await res.json();
-      const reply = data.reply || data.error || "Something went wrong.";
-      document.getElementById("chat-box").innerHTML += `<div class="chat-message bot">${reply}</div>`;
+      const reply = data.reply || "Something went wrong.";
+      // Add bot reply
+      chatBox.innerHTML += `<div class="chat-message bot">${reply}</div>`;
       chatBox.scrollTop = chatBox.scrollHeight;
     }
   </script>
