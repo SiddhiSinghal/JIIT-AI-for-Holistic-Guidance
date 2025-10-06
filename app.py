@@ -10,12 +10,18 @@ from agents.job_recommendation import recommend_jobs
 # Load .env
 load_dotenv()
 
-# Init OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Init OpenAI client (only if API key is available)
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key:
+    client = OpenAI(api_key=openai_api_key)
+    print("OpenAI client initialized successfully")
+else:
+    client = None
+    print("WARNING: OpenAI API key not found. Some features will use fallback responses.")
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(os.path.dirname(__file__), 'instance', 'app.db')}")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
