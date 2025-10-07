@@ -1,6 +1,34 @@
+# Flask Web Framework
+flask
+flask-sqlalchemy
+flask-login
+werkzeug
+
+# Streamlit (for elective recommendations)
 streamlit
+
+# Data Processing
 pandas
-python-dotenv
-plotly
+numpy
+scikit-learn
 openpyxl
+
+# AI/ML
+openai
 google-generativeai
+
+# Visualization
+plotly
+
+# Environment
+python-dotenv
+
+# Additional utilities
+requests
+
+Flask==2.3.5
+Flask-Login==0.6.2
+Flask-SQLAlchemy==3.0.5
+python-dotenv==1.0.0
+openai==1.29.0
+psycopg2-binary==2.9.9
