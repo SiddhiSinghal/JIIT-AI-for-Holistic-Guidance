@@ -1,127 +1,107 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, UserScores
-from dotenv import load_dotenv
-from openai import OpenAI
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from pymongo import MongoClient
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
-from agents.job_recommendation import recommend_jobs
 
-# Load .env
-load_dotenv()
-
-# Init OpenAI client (only if API key is available)
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if openai_api_key:
-    client = OpenAI(api_key=openai_api_key)
-    print("OpenAI client initialized successfully")
-else:
-    client = None
-    print("WARNING: OpenAI API key not found. Some features will use fallback responses.")
-
+# === Flask Setup ===
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(os.path.dirname(__file__), 'instance', 'app.db')}")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.secret_key = "super_secret_key"
 
-db.init_app(app)
+# === MongoDB Setup ===
+# Replace with your Atlas URI if needed
+client = MongoClient("mongodb://localhost:27017/")
+db = client["holistic_guidance"]
+users_collection = db["users"]
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
+# === Career Guidance Imports ===
+import orchestrator_cli
 
-from orchestrator import decide_and_call
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+# === Mental Health Import ===
+from summer_project.rag_chain import get_mental_health_response
 
 
-@app.route('/')
+# ==================== AUTH ROUTES ====================
+
+@app.route("/")
 def home():
-    return render_template('home.html')
-
-# ----------------- AUTH -----------------
-@app.route('/login', methods=['GET','POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        user = User.query.filter_by(email=email).first()
-        if user and user.check_password(password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        flash("Invalid credentials")
-    return render_template('login.html')
+    if "user" in session:
+        return render_template("index.html", user=session["user"])
+    return redirect(url_for("login"))
 
 
-@app.route('/signup', methods=['GET','POST'])
+@app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
-        password = request.form['password']
-        user = User(name=name, email=email)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        flash("Signup successful. Login now!")
-        return redirect(url_for('login'))
-    return render_template('signup.html')
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        if users_collection.find_one({"username": username}):
+            flash("Username already exists! Please log in.")
+            return redirect(url_for("login"))
+
+        hashed_pw = generate_password_hash(password)
+        users_collection.insert_one({"username": username, "password": hashed_pw})
+        flash("Signup successful! Please log in.")
+        return redirect(url_for("login"))
+
+    return render_template("signup.html")
 
 
-@app.route('/logout')
-@login_required
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        user = users_collection.find_one({"username": username})
+        if user and check_password_hash(user["password"], password):
+            session["user"] = username
+            return redirect(url_for("home"))
+        else:
+            flash("Invalid credentials!")
+    return render_template("login.html")
+
+
+@app.route("/logout")
 def logout():
-    logout_user()
-    return redirect(url_for('home'))
-
-# ----------------- DASHBOARD -----------------
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html', user=current_user)
+    session.pop("user", None)
+    flash("You have been logged out.")
+    return redirect(url_for("login"))
 
 
-# ----------------- SUBMIT SCORES -----------------
-@app.route("/submit_scores", methods=["POST"])
-@login_required
-def submit_scores():
-    # Collect user scores
-    scores = {k: int(request.form[k]) for k in [
-        "dsa","dbms","os","cn","math","aptitude","comm","problem_solving","creative","hackathons"
-    ]}
-    # Save scores
-    user_score = UserScores(user_id=current_user.id, **scores)
-    db.session.add(user_score)
-    db.session.commit()
+# ==================== CHAT ROUTES ====================
 
-    # Get top 3 jobs (recommend_jobs takes no parameters)
-    from agents.job_recommendation import recommend_jobs
-    top_jobs = recommend_jobs()  # Must return a list: ["Software Engineer", "Data Scientist", "Network Engineer"]
+@app.route("/career_chat", methods=["GET", "POST"])
+def career_chat():
+    if "user" not in session:
+        return redirect(url_for("login"))
 
-    # Format nicely for HTML
-    top_jobs_str = "<br>".join([f"{i+1}. {job}" for i, job in enumerate(top_jobs)])
+    result = None
+    if request.method == "POST":
+        prompt = request.form["prompt"]
+        task_type = orchestrator_cli.classify_prompt(prompt)
+        if task_type in orchestrator_cli.LLM_AGENTS:
+            result = orchestrator_cli.run_llm_agent(task_type, prompt)
+        else:
+            result = "❌ Unknown task type."
+
+    return render_template("career_chat.html", user=session["user"], result=result)
 
 
-    initial_message = f"Hello, {current_user.name} 👋<br>Based on your scores, here are your top 3 job recommendations:<br>{top_jobs_str}<br><br>You can now ask about any job or request a roadmap."
+@app.route("/mental_chat", methods=["GET", "POST"])
+def mental_chat():
+    if "user" not in session:
+        return redirect(url_for("login"))
 
-    # Render chat page and send initial message
-    return render_template("chat.html", initial_message=initial_message, user=current_user)
+    result = None
+    if request.method == "POST":
+        prompt = request.form["prompt"]
+        result = get_mental_health_response(prompt)
+
+    return render_template("mental_chat.html", user=session["user"], result=result)
 
 
-# ----------------- CHAT ROUTE -----------------
-@app.route('/chat', methods=['POST'])
-@login_required
-def chat():
-    try:
-        user_msg = request.json.get("message")
-        user_scores = {}  # Or fetch from DB if you want personalized job recommendations
-        response = decide_and_call(user_msg, user_scores=user_scores)  # removed user_name if not in orchestrator
-        return jsonify({"reply": response['payload']})
-    except Exception as e:
-        print("Error in chat:", e)
-        return jsonify({"reply": "Something went wrong."})
+# ==================== MAIN ====================
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)

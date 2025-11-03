@@ -1,9 +1,12 @@
 # agents/recommendation_agent.py
 
 import pandas as pd
-from collections import defaultdict
 from utils import ai_utils
 from utils.skills import SKILL_LABELS
+
+# --------------------------
+# 1. Load Grades
+# --------------------------
 def load_grades_from_txt(file_path: str) -> dict:
     grades = {}
     with open(file_path, "r") as f:
@@ -13,6 +16,7 @@ def load_grades_from_txt(file_path: str) -> dict:
                 grades[subj.strip()] = grade.strip()
     return grades
 
+
 # --------------------------
 # 2. Build Skill Profile
 # --------------------------
@@ -20,6 +24,7 @@ def build_skill_profile(grades_dict, subjects_df):
     return ai_utils.build_student_skill_profile(
         grades_dict, subjects_df, ai_utils.map_subject_to_skills
     )
+
 
 # --------------------------
 # 3. Recommendation Engine
@@ -36,7 +41,12 @@ def generate_recommendations(grades_dict, subjects_df, next_sem):
     
     results = []
     api_failures = 0
-    
+
+    # Temporarily silence internal print statements from ai_utils
+    import io, sys
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()  # Redirect prints to a dummy stream
+
     for _, r in next_df.iterrows():
         subj_name = r["Subject Name"]
         desc = r.get("Description", "")
@@ -46,15 +56,15 @@ def generate_recommendations(grades_dict, subjects_df, next_sem):
         strength_score = local_model.calculate_strength_score(
             grades_dict, subj_name, desc, subjects_df
         )
-        
-        # Market score (simulate API fallback like web app)
+
+        # Market score (safely handled)
         try:
             market_score_100 = ai_utils.get_subject_market_score(subj_name, desc)
             market_score = (market_score_100 / 100.0) * 10.0
         except Exception:
             api_failures += 1
             market_score_100, market_score = 60.0, 6.0
-        
+
         # Combined score
         combined_score = ai_utils.compute_combined_recommendation_score(
             strength_score, market_score, 0.6, 0.4
@@ -67,10 +77,13 @@ def generate_recommendations(grades_dict, subjects_df, next_sem):
             "MarketDemand": round(market_score_100, 2),
             "CombinedScore": round(combined_score, 2)
         })
-    
+
+    sys.stdout = old_stdout  # Restore normal printing
+
     # Convert to DataFrame
     results_df = pd.DataFrame(results)
     return results_df.sort_values(["Basket", "CombinedScore"], ascending=[True, False]), api_failures
+
 
 # --------------------------
 # 4. Main Runner
@@ -85,11 +98,12 @@ def run_recommendation_agent(grades_txt_path, subjects_xlsx_path, next_sem):
     for basket, grp in rec_df.groupby("Basket"):
         print(f"Basket {basket}:")
         for idx, row in grp.iterrows():
-            print(f"  {row['Subject']} | Strength: {row['Strength']} | Market: {row['MarketDemand']} | Combined: {row['CombinedScore']}")
+            print(f"  {row['Subject']} | Strength: {row['Strength']} | Combined Score: {row['CombinedScore']}")
         print("-"*50)
     
     if api_failures > 0:
         print(f"⚠️ {api_failures} subject(s) used fallback market scores due to API issues.")
+
 
 if __name__ == "__main__":
     run_recommendation_agent(

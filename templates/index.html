@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI for Holistic Guidance</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #74ABE2, #5563DE);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .card {
+      background-color: rgba(255, 255, 255, 0.15);
+      border: none;
+      border-radius: 1rem;
+      backdrop-filter: blur(8px);
+      padding: 2rem;
+    }
+    .btn-custom {
+      border-radius: 50px;
+      padding: 10px 25px;
+      font-weight: 600;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }
+    .btn-custom:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="card text-white">
+    <h2 class="fw-bold">Welcome, {{ user }} 👋</h2>
+    <p class="mb-4">Choose your AI Companion below</p>
+    <div class="d-flex flex-column flex-md-row justify-content-center gap-3">
+      <a href="{{ url_for('career_chat') }}" class="btn btn-primary btn-custom">💼 Career Guidance Chat</a>
+      <a href="{{ url_for('mental_chat') }}" class="btn btn-success btn-custom">🧠 Mental Health Chat</a>
+    </div>
+    <a href="{{ url_for('logout') }}" class="btn btn-outline-light mt-4 btn-custom">Logout</a>
+  </div>
+</body>
+</html>

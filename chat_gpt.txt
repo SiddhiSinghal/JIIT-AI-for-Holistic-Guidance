@@ -1,0 +1,1206 @@
+# agents/career_exploration.py
+import os, json
+from dotenv import load_dotenv
+load_dotenv()
+
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+if OPENAI_KEY:
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_KEY)
+
+def get_career_info(career_name: str):
+    """
+    Returns a dict with keys: title, description, skills, responsibilities, education, salary, outlook
+    Falls back to canned response if no OpenAI key
+    """
+    career_name = career_name.strip()
+    if not career_name:
+        return {"title": "", "description": "No career specified.", "skills": [], "responsibilities": [], "education": "", "salary": "", "outlook": ""}
+
+    if OPENAI_KEY:
+        prompt = f"""
+Provide detailed information about the job role '{career_name}' in JSON format with keys:
+"title","description","skills","responsibilities","education","salary","outlook".
+Make it professional and concise.
+"""
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role":"system","content":"You are a career guidance expert."},
+                          {"role":"user","content":prompt}],
+                temperature=0.3,
+                max_tokens=800
+            )
+            content = resp.choices[0].message.content
+            return json.loads(content)
+        except Exception as e:
+            print("OpenAI error:", e)
+    # fallback canned
+    return {
+        "title": career_name,
+        "description": f"{career_name} is a role that requires domain knowledge, problem solving and communication skills.",
+        "skills": ["Core domain skills", "Problem solving", "Communication"],
+        "responsibilities": ["Design solutions", "Collaborate with team"],
+        "education": "Relevant degree or self-taught experience",
+        "salary": "Varies by region",
+        "outlook": "Good"
+    }
+
+
+# agents/fact_checker.py
+from dotenv import load_dotenv
+import os
+from langchain_community.chat_models import ChatOllama
+from langchain_community.utilities import SerpAPIWrapper
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel
+from datetime import datetime
+
+load_dotenv()
+
+LLM_MODEL = os.getenv("LLM_MODEL", "mistral")
+SERPAPI_KEY = os.getenv("SERPAPI_API_KEY")
+
+class FactCheckResult(BaseModel):
+    verdict: str               # True / False / Uncertain
+    confidence: float          # Between 0 and 1
+    explanation: str
+    sources: list[str]
+
+parser = PydanticOutputParser(pydantic_object=FactCheckResult)
+llm = ChatOllama(model=LLM_MODEL)
+
+# Tools
+search_tool = SerpAPIWrapper(serpapi_api_key=SERPAPI_KEY)
+wiki_api = WikipediaAPIWrapper(top_k_results=1, doc_content_chars_max=2000)
+wiki_tool = WikipediaQueryRun(api_wrapper=wiki_api)
+
+def fact_check(claim: str):
+    """Fact-check a single claim. Returns structured result (FactCheckResult) or error dict."""
+    print(f"\n🔎 Fact-checking: {claim}")
+
+    try:
+        web_result = search_tool.run(claim)
+    except Exception as e:
+        print("⚠️ SerpAPI Error:", e)
+        web_result = f"Search failed: {e}"
+
+    try:
+        wiki_result = wiki_tool.run(claim)
+    except Exception as e:
+        print("⚠️ Wikipedia Error:", e)
+        wiki_result = f"Wikipedia lookup failed: {e}"
+
+    prompt = f"""
+Claim: "{claim}"
+
+Search Results:
+{web_result}
+
+Wikipedia Result:
+{wiki_result}
+
+Your job is to verify whether the above claim is true or false based on the evidence. If evidence is insufficient, mark it as "Uncertain".
+
+Respond ONLY in this JSON format:
+{parser.get_format_instructions()}
+"""
+
+    response = llm.invoke(prompt)
+
+    try:
+        # result = parser.parse(response)
+        result = parser.parse(response.content)
+
+        # Save to file
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("fact_check_log.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n--- {timestamp} ---\nClaim: {claim}\nResult: {result}\n\n")
+
+        return result
+
+    except Exception as e:
+        print("❌ Failed to parse response.", e)
+        return {"error": str(e), "raw_response": response.content}
+
+
+# job_recommendation.py
+import pickle
+import pandas as pd
+from models import UserScores
+from flask_login import current_user
+
+def load_model_and_encoder():
+    with open("agents/job_model.pkl", "rb") as f:
+        model = pickle.load(f)
+    with open("agents/label_encoder.pkl", "rb") as f:
+        encoder = pickle.load(f)
+    return model, encoder
+
+def recommend_jobs():
+    model, encoder = load_model_and_encoder()
+
+    # fetch latest scores of current user
+    latest = (
+        UserScores.query
+        .filter_by(user_id=current_user.id)
+        .order_by(UserScores.timestamp.desc())
+        .first()
+    )
+
+    if not latest:
+        return []  # return empty list if no scores
+
+    features = [
+        latest.dsa, latest.dbms, latest.os,
+        latest.cn, latest.math, latest.aptitude,
+        latest.comm, latest.problem_solving,
+        latest.creative, latest.hackathons
+    ]
+
+    # Convert to DataFrame to match training features
+    columns = ["DSA","DBMS","OS","CN","Mathmetics","Aptitute","Comm",
+               "Problem Solving","Creative","Hackathons"]
+    features_df = pd.DataFrame([features], columns=columns)
+
+    if hasattr(model, "predict_proba"):
+        probabilities = model.predict_proba(features_df)[0]
+        top_3_indices = probabilities.argsort()[-3:][::-1]
+        top_3_jobs = encoder.inverse_transform(top_3_indices).tolist()
+    else:
+        pred = model.predict(features_df)
+        top_3_jobs = encoder.inverse_transform(pred).tolist()
+
+    # ✅ Return a list instead of formatted string
+    return top_3_jobs
+
+
+# agents/linkedin_post_generator.py
+import os
+from dotenv import load_dotenv
+import ollama
+
+load_dotenv()
+
+# model name is configurable via env LLM_MODEL, default 'mistral'
+LLM_MODEL = os.getenv("LLM_MODEL", "mistral")
+
+def generate_linkedin_post(domain: str, pointers: list[str]) -> str:
+    """
+    domain: short domain label (e.g., 'AI', 'marketing')
+    pointers: list of bullet-point strings (key insights)
+    returns final linkedin post text
+    """
+    bullet_points = '\n'.join(f"- {point.strip()}" for point in pointers)
+
+    prompt = f"""
+You are a professional LinkedIn content writer.
+
+Write a compelling, human-like LinkedIn post based on the following:
+Domain: {domain}
+
+Key Points:
+{bullet_points}
+
+Guidelines:
+- Total length: around 1100 to 1200 characters (not words)
+- Tone: Professional and inspiring (no emojis or hashtags)
+- Structure: 1–2 short paragraphs
+- Start with a hook, end with insight or reflection
+- Do not use bullet points in the output
+"""
+
+    response = ollama.chat(
+        model=LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return response['message']['content']
+
+
+# agents/roadmap.py
+import os, json
+from dotenv import load_dotenv
+load_dotenv()
+
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+if OPENAI_KEY:
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_KEY)
+
+def get_roadmap(job_role: str, user_scores: dict, weeks: int = 10):
+    job_role = job_role.strip()
+    score_summary = "\n".join([f"{k}: {v}" for k,v in user_scores.items()]) if user_scores else "No scores provided."
+    if OPENAI_KEY:
+        prompt = f"""
+You are an expert career counselor.
+Student scores:
+{score_summary}
+
+Generate a 5-step roadmap to become a '{job_role}' in {weeks} weeks.
+Return JSON like:
+{{"step_1":{{"task":"", "weeks":1, "resources":["","",""]}}, ... "step_5":{{...}}}}
+Ensure the sum of weeks is {weeks}. Return only JSON.
+"""
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role":"system","content":"You are an assistant that outputs only JSON roadmaps."},
+                          {"role":"user","content":prompt}],
+                temperature=0.2,
+                max_tokens=1000
+            )
+            content = resp.choices[0].message.content
+            return json.loads(content)
+        except Exception as e:
+            print("OpenAI error:", e)
+    # fallback heuristic roadmap
+    per_step = max(1, weeks // 5)
+    roadmap = {}
+    for i in range(5):
+        roadmap[f"step_{i+1}"] = {
+            "task": f"Step {i+1}: Learn/practice {job_role}-related topics.",
+            "weeks": per_step,
+            "resources": [f"{job_role} resource {i+1}-1", f"{job_role} resource {i+1}-2", f"{job_role} resource {i+1}-3"]
+        }
+    # adjust last step weeks to make sum equal
+    total = per_step*5
+    if total != weeks:
+        diff = weeks - total
+        roadmap["step_5"]["weeks"] += diff
+    return roadmap
+
+
+# agents/tools.py
+from langchain_community.utilities import SerpAPIWrapper
+from langchain_community.utilities import WikipediaAPIWrapper
+from langchain_community.tools import WikipediaQueryRun
+from langchain.tools import Tool
+from datetime import datetime
+import os
+
+# expects SERPAPI_API_KEY in env
+SERPAPI_KEY = os.getenv("SERPAPI_API_KEY")
+
+# SerpAPI wrapper (search)
+search_tool = SerpAPIWrapper(serpapi_api_key=SERPAPI_KEY)
+
+# Wikipedia
+wiki_api = WikipediaAPIWrapper(top_k_results=1, doc_content_chars_max=2000)
+wiki_query = WikipediaQueryRun(api_wrapper=wiki_api)
+wiki_tool = wiki_query
+
+# Save tool
+def save_to_txt(data: str, filename: str = "research_output.txt") -> str:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted_text = f"--- Research Output --- \nTimestamp: {timestamp}\n\n{data}\n\n"
+    with open(filename, "a", encoding="utf-8") as f:
+        f.write(formatted_text)
+    return f"✅ Data successfully saved to {filename}"
+
+
+
+import pickle
+import pandas as pd
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+
+# === Paths ===
+here = os.path.dirname(__file__)
+csv_path = os.path.join(here, "Student Placement.csv")  # replace with your CSV filename
+model_path = os.path.join(here, "job_model.pkl")
+encoder_path = os.path.join(here, "label_encoder.pkl")
+
+# === Step 1: Load CSV ===
+data = pd.read_csv(csv_path)
+
+# === Step 2: Select numeric features ===
+feature_cols = ['DSA','DBMS','OS','CN','Mathmetics','Aptitute','Comm',
+                'Problem Solving','Creative','Hackathons']
+X = data[feature_cols]
+
+# === Step 3: Encode target labels ===
+encoder = LabelEncoder()
+y = encoder.fit_transform(data['Profile'])
+
+# === Step 4: Train RandomForest model ===
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X, y)
+
+# === Step 5: Save model and encoder ===
+with open(model_path, "wb") as f:
+    pickle.dump(model, f)
+
+with open(encoder_path, "wb") as f:
+    pickle.dump(encoder, f)
+
+print(f"✅ Model saved to {model_path}")
+print(f"✅ Label encoder saved to {encoder_path}")
+
+
+# agents/web_researcher.py
+from dotenv import load_dotenv
+import os
+from pydantic import BaseModel
+from langchain_community.chat_models import ChatOllama
+from langchain_core.output_parsers import PydanticOutputParser
+from .tools import search_tool, wiki_tool, save_to_txt
+from datetime import datetime
+
+load_dotenv()
+
+# model name configurable
+LLM_MODEL = os.getenv("LLM_MODEL", "mistral")
+
+class ResearchRespone(BaseModel):
+    topic: str
+    summary: str
+    sources: list[str]
+    tools_used: list[str]
+
+parser = PydanticOutputParser(pydantic_object=ResearchRespone)
+llm = ChatOllama(model=LLM_MODEL)
+
+def run_research(query: str):
+    """Return parsed structured research response and save to file."""
+    print(f"\n🔍 Running research for: {query}")
+
+    try:
+        search_result = search_tool.run(query)
+    except Exception as e:
+        search_result = f"Search failed: {e}"
+        print("⚠️ Search error:", e)
+
+    try:
+        wiki_result = wiki_tool.run(query)
+    except Exception as e:
+        wiki_result = f"Wikipedia lookup failed: {e}"
+        print("⚠️ Wikipedia error:", e)
+
+    tool_output = f"""
+The user asked: {query}
+
+Search Results:
+{search_result}
+
+Wikipedia Result:
+{wiki_result}
+
+You used the following tools: search, wikipedia, save_text_to_file.
+
+Now generate a structured research response using this data.
+
+Respond in this format:
+{parser.get_format_instructions()}
+"""
+
+    response = llm.invoke(tool_output)
+
+    try:
+        # structured = parser.parse(response)
+        structured = parser.parse(response.content)
+
+        # Save structured output to file
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        save_to_txt(f"Query: {query}\n\nSearch Result:\n{search_result}\n\nWikipedia:\n{wiki_result}\n\nStructured:\n{structured}\n", filename="final_research_output.txt")
+        print("\n📁 Research saved to 'final_research_output.txt'")
+
+        return structured
+
+    except Exception as e:
+        print("❌ Failed to parse response.", e)
+        return {"error": str(e), "raw_response": response.content}
+
+
+//second prompt
+
+#app.py
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from models import db, User, UserScores
+from dotenv import load_dotenv
+from openai import OpenAI
+import os
+from agents.job_recommendation import recommend_jobs
+
+# Load .env
+load_dotenv()
+
+# Init OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+app = Flask(__name__)
+app.secret_key = "supersecretkey"
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://siddhi:yourpassword@localhost:5432/ai_agents"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+from orchestrator import decide_and_call
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
+@app.route('/')
+def home():
+    return render_template('home.html')
+
+# ----------------- AUTH -----------------
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        flash("Invalid credentials")
+    return render_template('login.html')
+
+
+@app.route('/signup', methods=['GET','POST'])
+def signup():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+        user = User(name=name, email=email)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        flash("Signup successful. Login now!")
+        return redirect(url_for('login'))
+    return render_template('signup.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('home'))
+
+# ----------------- DASHBOARD -----------------
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    return render_template('dashboard.html', user=current_user)
+
+
+# ----------------- SUBMIT SCORES -----------------
+@app.route("/submit_scores", methods=["POST"])
+@login_required
+def submit_scores():
+    # Collect user scores
+    scores = {k: int(request.form[k]) for k in [
+        "dsa","dbms","os","cn","math","aptitude","comm","problem_solving","creative","hackathons"
+    ]}
+    # Save scores
+    user_score = UserScores(user_id=current_user.id, **scores)
+    db.session.add(user_score)
+    db.session.commit()
+
+    # Get top 3 jobs (recommend_jobs takes no parameters)
+    from agents.job_recommendation import recommend_jobs
+    top_jobs = recommend_jobs()  # Must return a list: ["Software Engineer", "Data Scientist", "Network Engineer"]
+
+    # Format nicely for HTML
+    top_jobs_str = "<br>".join([f"{i+1}. {job}" for i, job in enumerate(top_jobs)])
+
+
+    initial_message = f"Hello, {current_user.name} 👋<br>Based on your scores, here are your top 3 job recommendations:<br>{top_jobs_str}<br><br>You can now ask about any job or request a roadmap."
+
+    # Render chat page and send initial message
+    return render_template("chat.html", initial_message=initial_message, user=current_user)
+
+
+# ----------------- CHAT ROUTE -----------------
+@app.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    try:
+        user_msg = request.json.get("message")
+        user_scores = {}  # Or fetch from DB if you want personalized job recommendations
+        response = decide_and_call(user_msg, user_scores=user_scores)  # removed user_name if not in orchestrator
+        return jsonify({"reply": response['payload']})
+    except Exception as e:
+        print("Error in chat:", e)
+        return jsonify({"reply": "Something went wrong."})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+# app.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+import os
+import plotly.express as px
+from utils.ai_utils import (
+    map_subject_to_skills, get_subject_market_score,
+    build_student_skill_profile,
+    score_subject_for_student,
+    GRADE_MAP,
+    compute_subject_score,
+    compute_combined_recommendation_score,
+    compute_local_strength_score,
+)
+from utils.skills import SKILL_LABELS
+
+st.set_page_config(layout="wide", page_title="🎓 Smart Elective & MOOC Advisor")
+st.title("🎓 Smart Elective & MOOC Advisor — Skill-label driven")
+
+st.sidebar.header("Dataset & Settings")
+FILE_PATH = "data/subjects.xlsx"
+
+if not os.path.exists(FILE_PATH):
+    st.sidebar.error(f"❌ Master dataset not found at `{FILE_PATH}`. Please place your file there.")
+    st.stop()
+
+master_df = pd.read_excel(FILE_PATH) if FILE_PATH.endswith(".xlsx") else pd.read_csv(FILE_PATH)
+master_df.columns = [c.strip() for c in master_df.columns]
+
+required = {"Semester", "Subject Code", "Subject Name", "Code", "Type"}
+if not required.issubset(set(master_df.columns)):
+    st.error(f"❌ Master file must contain columns: {required}")
+    st.stop()
+
+
+current_sem = st.sidebar.number_input("📌 Your current semester", min_value=5, max_value=8, value=5)
+completed_semesters = list(range(1, current_sem))
+
+st.header("1️⃣ Enter grades for subjects you've completed")
+completed_df = master_df[master_df["Semester"].isin(completed_semesters)].copy()
+
+if completed_df.empty:
+    st.error("⚠️ No completed subjects found for the selected semester in dataset.")
+    st.stop()
+
+student_grades = {}
+
+if "show_grade_form" not in st.session_state:
+    st.session_state["show_grade_form"] = False
+if "grades_entered" not in st.session_state:
+    st.session_state["grades_entered"] = False
+if "student_grades" not in st.session_state:
+    st.session_state["student_grades"] = {}
+if "student_profile" not in st.session_state:
+    st.session_state["student_profile"] = {}
+
+if st.button("✍️ Start Entering Grades"):
+    st.session_state["show_grade_form"] = True
+
+if st.session_state["show_grade_form"] and not st.session_state["grades_entered"]:
+    st.info("Please fill in your grades below and click 'Submit Grades' when done.")
+
+    for sem in sorted(completed_df["Semester"].unique()):
+        st.subheader(f"Semester {sem}")
+        sem_df = completed_df[completed_df["Semester"] == sem]
+
+        for basket_code, basket_group in sem_df.groupby("Code"):
+            if len(basket_group) == 1 or all(basket_group["Type"].isin(["C", "Core-Audit"])):
+                for _, row in basket_group.iterrows():
+                    code, name = row["Subject Code"], row["Subject Name"]
+                    st.selectbox(
+                        f"{name} ({code})",
+                        options=list(GRADE_MAP.keys()),
+                        index=list(GRADE_MAP.keys()).index("A"),
+                        key=f"grade_{code}"
+                    )
+
+            else:
+                st.markdown(f"**Basket {basket_code}** — Choose the elective you actually took:")
+                elective_names = {
+                    f"{r['Subject Name']} ({r['Subject Code']})": r["Subject Code"]
+                    for _, r in basket_group.iterrows()
+                }
+                chosen_display = st.selectbox(
+                    f"Select elective for Basket {basket_code}",
+                    options=["-- Select --"] + list(elective_names.keys()),
+                    key=f"elective_select_{basket_code}"
+                )
+                if chosen_display and chosen_display != "-- Select --":
+                    chosen_code = elective_names[chosen_display]
+                    st.selectbox(
+                        f"Grade for {chosen_display}",
+                        options=list(GRADE_MAP.keys()),
+                        index=list(GRADE_MAP.keys()).index("A"),
+                        key=f"grade_{chosen_code}"
+                    )
+
+    if st.button("✅ Submit Grades"):
+        built_grades = {}
+        for sem in sorted(completed_df["Semester"].unique()):
+            sem_df = completed_df[completed_df["Semester"] == sem]
+            for basket_code, basket_group in sem_df.groupby("Code"):
+                if len(basket_group) == 1 or all(basket_group["Type"].isin(["C", "Core-Audit"])):
+                    for _, row in basket_group.iterrows():
+                        code = row["Subject Code"]
+                        grade_val = st.session_state.get(f"grade_{code}", None)
+                        if grade_val:
+                            built_grades[code] = grade_val
+
+                else:
+                    chosen_display = st.session_state.get(f"elective_select_{basket_code}", "-- Select --")
+                    if chosen_display and chosen_display != "-- Select --":
+                        elective_map = {f"{r['Subject Name']} ({r['Subject Code']})": r["Subject Code"] for _, r in basket_group.iterrows()}
+                        chosen_code = elective_map.get(chosen_display)
+                        if chosen_code:
+                            grade_val = st.session_state.get(f"grade_{chosen_code}", None)
+                            if grade_val:
+                                built_grades[chosen_code] = grade_val
+
+        st.session_state["student_grades"] = built_grades
+        st.session_state["grades_entered"] = True
+
+        with st.spinner("Computing your skill profile..."):
+            profile = build_student_skill_profile(st.session_state["student_grades"], completed_df, map_subject_to_skills)
+            st.session_state["student_profile"] = profile or {}
+
+        st.success("✅ Grades submitted and skill profile computed. You can now view recommendations below.")
+
+st.markdown("---")
+if not st.session_state.get("grades_entered", False):
+    st.header("2️⃣ Build your skill profile")
+    st.info("Please click 'Start Entering Grades' and submit your grades to reveal skill profile and recommendations.")
+else:
+    st.header("2️⃣ Build your skill profile")
+
+    if st.button("⚡ Build Skill Profile"):
+        if not st.session_state.get("student_grades", {}):
+            st.warning("⚠️ Please enter grades first before building skill profile.")
+        else:
+            with st.spinner("Building skill profile..."):
+                profile = build_student_skill_profile(st.session_state.get("student_grades", {}), completed_df, map_subject_to_skills)
+
+                if not profile:
+                    st.warning("⚠️ No skills derived. Check your inputs.")
+                else:
+                    max_val, min_val = max(profile.values()), min(profile.values())
+                    viz = {k: ((v - min_val) / (max_val - min_val)) * 100 if max_val > min_val else 50
+                           for k, v in profile.items()}
+
+                    top_skills = sorted(viz.items(), key=lambda x: x[1], reverse=True)[:15]
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.subheader("🎯 Skill Radar Chart (Top 15)")
+                        radar_df = pd.DataFrame(top_skills, columns=["Skill", "Value"])
+                        fig = px.line_polar(radar_df, r="Value", theta="Skill", line_close=True)
+                        fig.update_traces(fill="toself", line_color="blue", fillcolor="rgba(0,100,200,0.3)")
+                        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=500)
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    with col2:
+                        st.subheader("📊 Skill Strength Bar Chart")
+                        bar_df = pd.DataFrame(top_skills, columns=["Skill", "Strength (%)"])
+                        fig_bar = px.bar(bar_df.sort_values("Strength (%)"),
+                                         x="Strength (%)", y="Skill", orientation='h',
+                                         color="Strength (%)", color_continuous_scale="viridis")
+                        st.plotly_chart(fig_bar, use_container_width=True)
+
+                    st.session_state["student_profile"] = profile
+
+st.markdown("---")
+st.header("3️⃣ Recommendations for Next Semester")
+
+next_sem = current_sem + 1
+next_df = master_df[(master_df["Semester"] == next_sem) & (master_df["Type"].isin(["E", "OC"]))]
+
+if next_df.empty:
+    st.info("No electives/optional cores for next semester.")
+    st.stop()
+
+st.info(f"📚 {len(next_df['Code'].unique())} baskets | {len(next_df)} subjects found for Sem {next_sem}")
+
+if not st.session_state.get("grades_entered", False):
+    st.warning("Please enter and submit your grades first to compute personalized recommendations.")
+    st.stop()
+
+if st.button("🔍 Map next-semester subjects to skills"):
+    with st.spinner("Mapping subjects..."):
+        for _, r in next_df.iterrows():
+            _ = map_subject_to_skills(r["Subject Name"], r.get("Description", ""))
+    st.success("✅ Mapping cached.")
+
+view = st.radio("Choose view:", ["Strength Analysis", "Market Trend Analysis", "Combined Recommendation"])
+
+student_profile = st.session_state.get("student_profile", {})
+student_grades = st.session_state.get("student_grades", {})
+subject_rows, api_failures = [], 0
+
+for _, r in next_df.iterrows():
+    subj_code, subj_name, desc = r["Subject Code"], r["Subject Name"], r.get("Description", "")
+    subj_skill_map = map_subject_to_skills(subj_name, desc)
+
+    strength_score = compute_local_strength_score(student_grades, subj_name, desc, master_df, map_subject_to_skills)
+    try:
+        market_score_100 = get_subject_market_score(subj_name, desc)
+        market_score = (market_score_100 / 100.0) * 10.0
+    except Exception:
+        api_failures += 1
+        market_score_100, market_score = 60.0, 6.0
+
+    subject_rows.append({
+        "Basket": r["Code"],
+        "Subject Code": subj_code,
+        "Subject Name": subj_name,
+        "Skills (sample)": ", ".join(list(subj_skill_map.keys())[:4]),
+        "Strength Score": round(float(strength_score) if not np.isnan(strength_score) else 0.0, 2),
+        "Market Score (0-10)": round(market_score, 2),
+        "Market Score (0-100)": round(market_score_100, 2)
+    })
+
+results_df = pd.DataFrame(subject_rows)
+
+if view == "Strength Analysis":
+    st.subheader("💪 Ranked by Strength")
+    for basket, grp in results_df.groupby("Basket"):
+        sorted_grp = grp.sort_values("Strength Score", ascending=False).reset_index(drop=True)
+        sorted_grp["Rank"] = range(1, len(sorted_grp)+1)
+        st.dataframe(sorted_grp.drop(columns=["Skills (sample)"],), use_container_width=True)
+        st.success(f"🏆 Best for Basket {basket}: {sorted_grp.iloc[0]['Subject Name']} ({sorted_grp.iloc[0]['Strength Score']:.2f})")
+        st.markdown("---")
+
+elif view == "Market Trend Analysis":
+    st.subheader("📈 Ranked by Market Demand")
+    for basket, grp in results_df.groupby("Basket"):
+        sorted_grp = grp.sort_values("Market Score (0-100)", ascending=False).reset_index(drop=True)
+        sorted_grp["Rank"] = range(1, len(sorted_grp)+1)
+        st.dataframe(sorted_grp.drop(columns=["Skills (sample)"],), use_container_width=True)
+        st.success(f"🏆 Market hotpick for Basket {basket}: {sorted_grp.iloc[0]['Subject Name']} ({sorted_grp.iloc[0]['Market Score (0-100)']:.1f})")
+        st.markdown("---")
+
+else:
+    st.subheader("⚖️ Combined Recommendation")
+    w_strength = st.slider("Weight for Strength (%)", 0, 100, 60)
+    w_market = 100 - w_strength
+
+    results_df["Combined"] = results_df.apply(
+        lambda row: compute_combined_recommendation_score(
+            row["Strength Score"],
+            row["Market Score (0-10)"],
+            w_strength/100,
+            w_market/100
+        ), axis=1
+    )
+
+    for basket, grp in results_df.groupby("Basket"):
+        sorted_grp = grp.sort_values("Combined", ascending=False).reset_index(drop=True)
+        sorted_grp["Rank"] = range(1, len(sorted_grp)+1)
+        st.dataframe(sorted_grp.drop(columns=["Skills (sample)"],), use_container_width=True)
+        st.success(f"🏆 Best overall for Basket {basket}: {sorted_grp.iloc[0]['Subject Name']} ({sorted_grp.iloc[0]['Combined']:.2f})")
+        st.markdown("---")
+
+st.success("✅ 100% AI-Free — Uses only local analysis + free job APIs")
+if api_failures > 0:
+    st.warning(f"⚠️ {api_failures} subject(s) used fallback scores due to API issues.")
+
+
+# agents/market_score_agent.py
+
+import sys
+import os
+
+# Ensure project root is on sys.path so top-level packages like `agents` can be imported
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils.ai_utils import get_subject_market_score
+
+def interpret_market_score(score: float) -> str:
+    """
+    Provide a textual meaning for the market score.
+    """
+    if score >= 90:
+        return "Excellent demand in the market. Highly recommended for career prospects."
+    elif score >= 75:
+        return "Strong demand in the market. Good opportunities available."
+    elif score >= 60:
+        return "Moderate demand. Some opportunities, consider carefully."
+    elif score >= 45:
+        return "Low demand. Limited opportunities; skill enhancement recommended."
+    else:
+        return "Very low demand. Consider alternative subjects or skills."
+
+class MarketScoreAgent:
+    def __init__(self):
+        pass
+
+    def get_score(self, subject_name: str) -> dict:
+        """
+        Compute market score for a given subject and provide interpretation.
+        """
+        score = get_subject_market_score(subject_name)
+        meaning = interpret_market_score(score)
+        return {
+            "subject": subject_name,
+            "market_score": score,
+            "meaning": meaning
+        }
+
+# Example usage:
+if __name__ == "__main__":
+    agent = MarketScoreAgent()
+    subject = "Neurology"
+    result = agent.get_score(subject)
+    print(result)
+
+
+# models.py
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+db = SQLAlchemy()
+
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    password_hash = db.Column(db.String(300), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class UserScores(db.Model):
+    __tablename__ = "user_scores"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    dsa = db.Column(db.Integer, default=0)
+    dbms = db.Column(db.Integer, default=0)
+    os = db.Column(db.Integer, default=0)
+    cn = db.Column(db.Integer, default=0)
+    math = db.Column(db.Integer, default=0)
+    aptitude = db.Column(db.Integer, default=0)
+    comm = db.Column(db.Integer, default=0)
+    problem_solving = db.Column(db.Integer, default=0)
+    creative = db.Column(db.Integer, default=0)
+    hackathons = db.Column(db.Integer, default=0)
+    timestamp = db.Column(db.DateTime, server_default=db.func.now())
+
+    user = db.relationship("User", backref="scores")
+
+
+
+# orchestrator.py
+from agents import career_exploration, roadmap, job_recommendation
+
+def dict_to_string(d):
+    """Convert dict to readable string for chat"""
+    if not isinstance(d, dict):
+        return str(d)
+    text = ""
+    for k, v in d.items():
+        if isinstance(v, list):
+            v = ", ".join(map(str, v))
+        text += f"{k.capitalize()}: {v}\n"
+    return text
+
+def decide_and_call(message: str, user_scores=None):
+    m = message.lower().strip()
+
+    # Career exploration
+    if "tell me about" in m or m.startswith("career"):
+        parts = message.split("about", 1)
+        target = parts[1].strip() if len(parts) > 1 else message
+        info = career_exploration.get_career_info(target)
+        payload = dict_to_string(info)
+        return {"type": "career", "payload": payload}
+
+    # Roadmap
+    if "how to become" in m or "roadmap" in m or "plan to become" in m or m.startswith("how to"):
+        for phrase in ["how to become", "roadmap to become", "roadmap for", "how to"]:
+            if phrase in m:
+                role = m.split(phrase,1)[1].strip()
+                break
+        else:
+            role = message
+        info = roadmap.get_roadmap(role, user_scores or {}, weeks=10)
+        payload = dict_to_string(info) if isinstance(info, dict) else str(info)
+        return {"type": "roadmap", "payload": payload}
+
+    # Job recommendation
+    if "recommend" in m or "suggest job" in m or "which job" in m or "job for me" in m:
+        vals = None
+        if isinstance(user_scores, dict):
+            order = ['DSA','DBMS','OS','CN','Mathmetics','Aptitute','Comm','Problem_Solving','Creative','Hackathons']
+            vals = [user_scores.get(k,0) for k in order]
+        else:
+            vals = [50]*10
+        payload = job_recommendation.predict_jobs_from_list(vals)
+        payload = dict_to_string(payload) if isinstance(payload, dict) else str(payload)
+        return {"type": "job_recommendation", "payload": payload}
+
+    # fallback
+    return {"type": "unknown", "payload": "Sorry, I couldn't understand. Try asking 'Tell me about Data Scientist' or 'How to become Data Scientist' or 'Give me job recommendation'."}
+
+
+
+# agents/prompt_classifier_agent.py
+
+class PromptClassifierAgent:
+    def __init__(self):
+        # Define keywords for each intent
+        self.rules = {
+            "recommendation": ["recommend", "elective", "suggest", "next semester"],
+            "profile": ["profile", "skills", "strength", "chart", "analyze"],
+            "market": ["market", "demand", "scope", "trend", "job", "career"],
+            "help": ["help", "guide", "instructions"]
+        }
+
+    def classify(self, prompt: str) -> dict:
+        prompt_lower = prompt.lower()
+
+        # Match based on rules
+        for intent, keywords in self.rules.items():
+            if any(word in prompt_lower for word in keywords):
+                return {"intent": intent}
+
+        # Default fallback
+        return {"intent": "other"}
+
+
+
+# agents/recommendation_agent.py
+
+import pandas as pd
+from collections import defaultdict
+from utils import ai_utils
+from utils.skills import SKILL_LABELS
+def load_grades_from_txt(file_path: str) -> dict:
+    grades = {}
+    with open(file_path, "r") as f:
+        for line in f:
+            if ":" in line:
+                subj, grade = line.strip().split(":")
+                grades[subj.strip()] = grade.strip()
+    return grades
+
+# --------------------------
+# 2. Build Skill Profile
+# --------------------------
+def build_skill_profile(grades_dict, subjects_df):
+    return ai_utils.build_student_skill_profile(
+        grades_dict, subjects_df, ai_utils.map_subject_to_skills
+    )
+
+# --------------------------
+# 3. Recommendation Engine
+# --------------------------
+def generate_recommendations(grades_dict, subjects_df, next_sem):
+    local_model = ai_utils.LocalPredictionModel()
+    skill_profile = build_skill_profile(grades_dict, subjects_df)
+    
+    # Filter subjects for next semester (Electives/Optional Core)
+    next_df = subjects_df[
+        (subjects_df["Semester"] == next_sem) &
+        (subjects_df["Type"].isin(["E", "OC"]))
+    ]
+    
+    results = []
+    api_failures = 0
+    
+    for _, r in next_df.iterrows():
+        subj_name = r["Subject Name"]
+        desc = r.get("Description", "")
+        basket = r["Code"]
+        
+        # Strength score
+        strength_score = local_model.calculate_strength_score(
+            grades_dict, subj_name, desc, subjects_df
+        )
+        
+        # Market score (simulate API fallback like web app)
+        try:
+            market_score_100 = ai_utils.get_subject_market_score(subj_name, desc)
+            market_score = (market_score_100 / 100.0) * 10.0
+        except Exception:
+            api_failures += 1
+            market_score_100, market_score = 60.0, 6.0
+        
+        # Combined score
+        combined_score = ai_utils.compute_combined_recommendation_score(
+            strength_score, market_score, 0.6, 0.4
+        )
+        
+        results.append({
+            "Basket": basket,
+            "Subject": subj_name,
+            "Strength": round(strength_score, 2),
+            "MarketDemand": round(market_score_100, 2),
+            "CombinedScore": round(combined_score, 2)
+        })
+    
+    # Convert to DataFrame
+    results_df = pd.DataFrame(results)
+    return results_df.sort_values(["Basket", "CombinedScore"], ascending=[True, False]), api_failures
+
+# --------------------------
+# 4. Main Runner
+# --------------------------
+def run_recommendation_agent(grades_txt_path, subjects_xlsx_path, next_sem):
+    grades_dict = load_grades_from_txt(grades_txt_path)
+    subjects_df = pd.read_excel(subjects_xlsx_path)
+    
+    rec_df, api_failures = generate_recommendations(grades_dict, subjects_df, next_sem)
+    
+    print("\n🏆 Recommended Electives for Next Semester\n")
+    for basket, grp in rec_df.groupby("Basket"):
+        print(f"Basket {basket}:")
+        for idx, row in grp.iterrows():
+            print(f"  {row['Subject']} | Strength: {row['Strength']} | Market: {row['MarketDemand']} | Combined: {row['CombinedScore']}")
+        print("-"*50)
+    
+    if api_failures > 0:
+        print(f"⚠️ {api_failures} subject(s) used fallback market scores due to API issues.")
+
+if __name__ == "__main__":
+    run_recommendation_agent(
+        grades_txt_path="gradesheet.txt",
+        subjects_xlsx_path="data/subjects.xlsx",
+        next_sem=6
+    )
+
+
+
+# agents/skill_profiler_agent.py
+
+import pandas as pd
+import plotly.express as px
+from collections import defaultdict
+
+from utils import ai_utils
+from utils.skills import SKILL_LABELS
+
+# --------------------------
+# 1. Parse Grades from .txt
+# --------------------------
+def load_grades_from_txt(file_path: str) -> dict:
+    grades = {}
+    with open(file_path, "r") as f:
+        for line in f:
+            if ":" in line:
+                subj, grade = line.strip().split(":")
+                grades[subj.strip()] = grade.strip()
+    return grades
+
+# --------------------------
+# 2. Skill Profiling
+# --------------------------
+def build_skill_profile(grades_dict, subjects_df):
+    return ai_utils.build_student_skill_profile(
+        grades_dict, subjects_df, ai_utils.map_subject_to_skills
+    )
+
+# --------------------------
+# 3. Charting
+# --------------------------
+def plot_skill_profile(skill_profile):
+    if not skill_profile:
+        print("⚠️ No skills found in profile.")
+        return
+
+    # Normalize for 0-100
+    max_val, min_val = max(skill_profile.values()), min(skill_profile.values())
+    viz = {
+        k: ((v - min_val) / (max_val - min_val)) * 100 if max_val > min_val else 50
+        for k, v in skill_profile.items()
+    }
+
+    top_skills = sorted(viz.items(), key=lambda x: x[1], reverse=True)[:15]
+    radar_df = pd.DataFrame(top_skills, columns=["Skill", "Value"])
+    bar_df = pd.DataFrame(top_skills, columns=["Skill", "Strength (%)"])
+
+    # Radar Chart
+    fig_radar = px.line_polar(
+        radar_df, r="Value", theta="Skill", line_close=True,
+        title="🎯 Skill Radar Chart (Top 15)"
+    )
+    fig_radar.update_traces(fill="toself", line_color="blue", fillcolor="rgba(0,100,200,0.3)")
+    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])))
+    fig_radar.show()
+
+    # Bar Chart
+    fig_bar = px.bar(
+        bar_df.sort_values("Strength (%)"),
+        x="Strength (%)", y="Skill", orientation="h",
+        color="Strength (%)", color_continuous_scale="viridis",
+        title="📊 Skill Strength Bar Chart (Top 15)"
+    )
+    fig_bar.show()
+
+def plot_subject_fit(grades_dict, subjects_df, skill_profile):
+    # Compute strength scores using local_prediction model
+    local_model = ai_utils.LocalPredictionModel()
+    scores = {}
+    for _, r in subjects_df.iterrows():
+        subj_name = r.get("Subject Name", "")
+        desc = r.get("Description", "")
+        score = local_model.calculate_strength_score(grades_dict, subj_name, desc, subjects_df)
+        scores[subj_name] = score
+
+    '''df = pd.DataFrame(list(scores.items()), columns=["Subject", "Strength Score"])
+    fig = px.bar(df, x="Subject", y="Strength Score", title="Subject Strength Scores")
+    fig.show()'''
+
+# --------------------------
+# 4. Main Agent Runner
+# --------------------------
+def run_skill_profiler(grades_txt_path, subjects_xlsx_path):
+    # Load inputs
+    grades_dict = load_grades_from_txt(grades_txt_path)
+    subjects_df = pd.read_excel(subjects_xlsx_path)
+
+    # Build skill profile
+    skill_profile = build_skill_profile(grades_dict, subjects_df)
+
+    # Charts
+    plot_skill_profile(skill_profile)
+    plot_subject_fit(grades_dict, subjects_df, skill_profile)
+
+
+if __name__ == "__main__":
+    # Example run
+    run_skill_profiler(
+        grades_txt_path="gradesheet.txt",
+        subjects_xlsx_path="data/subjects.xlsx"
+    )
+
+
+
+# test/test_prompt_classifier.py
+
+import sys
+import os
+
+# Ensure project root is on sys.path so top-level packages like `agents` can be imported
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from prompt_classifier_agent import PromptClassifierAgent
+
+classifier = PromptClassifierAgent()
+
+prompts = [
+    "Recommend me electives for next semester",
+    "Show my skill profile",
+    "Help me understand the system",
+    "What is AI?"
+]
+
+for p in prompts:
+    result = classifier.classify(p)
+    print(f"Prompt: {p} -> Intent: {result['intent']}")
