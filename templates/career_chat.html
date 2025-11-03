@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="chat-container">
+  <h3 class="mb-3 text-primary fw-bold">💼 Career Guidance Chat</h3>
+  <p class="text-muted">Ask anything about your career, skills, or roadmap — I’ll guide you.</p>
+  
+  <form method="POST" class="mt-4">
+    <textarea name="prompt" class="form-control shadow-sm" rows="4" placeholder="Ask about your career..."></textarea>
+    <button type="submit" class="btn btn-primary mt-3 px-4">Ask</button>
+  </form>
+
+  {% if result %}
+  <div class="alert alert-info mt-4 shadow-sm">
+    <strong>AI:</strong> {{ result }}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

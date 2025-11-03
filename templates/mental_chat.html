@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="chat-container">
+  <h3 class="mb-3 text-success fw-bold">🧠 Mental Health Companion</h3>
+  <p class="text-muted">How are you feeling today? I’m here to listen and help.</p>
+
+  <form method="POST" class="mt-4">
+    <textarea name="prompt" class="form-control shadow-sm" rows="4" placeholder="Share your thoughts..."></textarea>
+    <button type="submit" class="btn btn-success mt-3 px-4">Send</button>
+  </form>
+
+  {% if result %}
+  <div class="alert alert-info mt-4 shadow-sm">
+    <strong>AI:</strong> {{ result }}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
