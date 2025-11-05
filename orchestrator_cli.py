@@ -110,33 +110,71 @@ def run_llm_agent(agent_key: str, prompt: str):
 
 
 # ==================== NON-LLM AGENTS ====================
-def run_non_llm_agent(agent_key: str):
-    """Run non-LLM (ML) agents like job recommender."""
+def run_non_llm_agent(agent_key: str, username: str = None):
+    """Run non-LLM ML-based agent."""
+    from flask import session
+
     if agent_key == "job":
         from agents.job_recommendation import recommend_jobs
-        username = session.get("user")
-        print(f"🚀 Running job recommendation for user: {username}")
-        result = recommend_jobs(username)
-        return result
+        print("🚀 Fetching job recommendations based on your marks...")
+        return recommend_jobs(username)
 
     elif agent_key == "skills":
-        print("🚀 Launching Skill Profiler Agent...")
-        script_path = os.path.join("agents", "skill_profiler_agent.py")
-        subprocess.run([sys.executable, script_path])
-        return "✅ Skill Profiler Agent executed successfully."
+        print("🚀 Running Skill Profiler Agent...")
+        from agents.skill_profiler_agent import run_skill_profiler
 
-    elif agent_key == "subject":
-        print("📘 Generating recommended subjects...")
-        script_path = os.path.join("agents", "recommendation_agent.py")
-        subprocess.run([sys.executable, script_path])
-        return "✅ Subject Recommendation Agent executed successfully."
+        try:
+            skill_profile = run_skill_profiler(
+                subjects_xlsx_path="data/subjects.xlsx",
+                username=username,
+                show_plots=False  # Ensure we don’t pop up any graphs
+            )
+
+            if not skill_profile:
+                return "⚠️ No skill data found. Please upload your marksheet first."
+
+            # Sort top 10 skills
+            top_skills = sorted(skill_profile.items(), key=lambda x: x[1], reverse=True)[:10]
+
+            # --- Formatted Text ---
+            formatted_text = f"<b>🎯 Top Skills for {username}</b><br><br>"
+            for skill, score in top_skills:
+                formatted_text += f"• {skill}: {score:.2f}<br>"
+
+            # --- Progress Bars (HTML) ---
+            bars_html = "<div style='margin-top:10px;'>"
+            for skill, score in top_skills:
+                color = (
+                    "#4CAF50" if score >= 8 else
+                    "#FFC107" if score >= 6 else
+                    "#FF5722"
+                )
+                width = min(100, int(score * 10))
+                bars_html += f"""
+                <div style="margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:14px;">
+                        <span>{skill}</span><span>{score:.2f}</span>
+                    </div>
+                    <div style="background:#e0e0e0;border-radius:8px;height:10px;width:80%;">
+                        <div style="width:{width}%;background:{color};height:10px;border-radius:8px;"></div>
+                    </div>
+                </div>
+                """
+            bars_html += "</div>"
+
+            return formatted_text + bars_html
+
+        except Exception as e:
+            return f"⚠️ Error analyzing skills: {str(e)}"
 
     elif agent_key == "market":
-        mod = importlib.import_module(NON_LLM_AGENTS[agent_key])
-        return mod.get_market_score("AI Engineer")
+        from agents.market_score_agent import MarketScoreAgent
+        agent = MarketScoreAgent()
+        result = agent.get_score("Artificial Intelligence")
+        return f"📊 Market Score for {result['subject']}: {result['market_score']} ({result['meaning']})"
 
     else:
-        return f"⚠️ No valid ML agent found for '{agent_key}'"
+        return f"❌ No valid ML agent found for '{agent_key}'"
 
 
 # ==================== ORCHESTRATOR ====================

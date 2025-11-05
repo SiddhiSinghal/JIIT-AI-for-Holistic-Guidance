@@ -7,6 +7,8 @@ import fitz  # PyMuPDF
 import re
 import orchestrator_cli
 from summer_project.rag_chain import get_mental_health_response
+from markupsafe import Markup
+
 
 # ==== Import from utils for later integration ====
 from utils.ai_utils import (
@@ -193,29 +195,58 @@ def unified_chat():
     chat_history = session.get("chat_history", [])
 
     if request.method == "POST":
-        user_message = request.form["prompt"]
-        chat_history.append({"sender": "user", "text": user_message})
+        user_message = request.form["prompt"].strip()
+        if not user_message:
+            flash("⚠️ Please enter a message.")
+            return redirect(url_for("unified_chat"))
 
-        # 🔹 Detect if emotional message (redirect to mental health)
-        stress_keywords = ["tired", "stressed", "sad", "depressed", "done", "fed up", "hopeless", "burnout"]
-        if any(word in user_message.lower() for word in stress_keywords):
-            ai_reply = get_mental_health_response(user_message)
-        else:
-            task_type = orchestrator_cli.classify_prompt(user_message)
-            if task_type in orchestrator_cli.LLM_AGENTS:
-                ai_reply = orchestrator_cli.run_llm_agent(task_type, user_message)
-            elif task_type in orchestrator_cli.NON_LLM_AGENTS:
-                ai_reply = orchestrator_cli.run_non_llm_agent(task_type)
+        # 🧠 Add user message to chat history
+        chat_history.append({"sender": "user", "text": user_message, "html": False})
+
+        # 🔹 Detect if user seems emotionally low → redirect to mental health model
+        stress_keywords = [
+            "tired", "stressed", "sad", "depressed", "done",
+            "fed up", "hopeless", "burnout", "anxious", "lonely"
+        ]
+
+        try:
+            if any(word in user_message.lower() for word in stress_keywords):
+                # 💬 Empathetic mental health response
+                ai_reply = get_mental_health_response(user_message)
+
             else:
-                ai_reply = "🤖 I'm here to help — is this about your career or how you’re feeling today?"
+                # 🧭 Route to appropriate LLM or ML agent
+                task_type = orchestrator_cli.classify_prompt(user_message)
 
-        chat_history.append({"sender": "ai", "text": ai_reply})
+                if task_type in orchestrator_cli.LLM_AGENTS:
+                    ai_reply = orchestrator_cli.run_llm_agent(task_type, user_message)
+
+                elif task_type in orchestrator_cli.NON_LLM_AGENTS:
+                    ai_reply = orchestrator_cli.run_non_llm_agent(task_type, username=username)
+
+                else:
+                    ai_reply = (
+                        "🤖 I'm here to help — could you tell me whether this is about your "
+                        "<b>career</b> or <b>mental well-being</b>?"
+                    )
+
+        except Exception as e:
+            ai_reply = f"⚠️ Sorry, there was an error: {str(e)}"
+
+        # 💡 Append AI response (HTML allowed for skill charts, job lists, etc.)
+        chat_history.append({"sender": "ai", "text": Markup(ai_reply), "html": True})
+
+        # Save updated conversation
         session["chat_history"] = chat_history
         return redirect(url_for("unified_chat"))
 
-    return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
+    # Render chat template
+    return render_template(
+        "chat.html",
+        user=username,
+        chat_type="Unified",
+        chat_history=chat_history
+    )
 
-
-# ==================== RUN SERVER ====================
 if __name__ == "__main__":
     app.run(debug=True)
