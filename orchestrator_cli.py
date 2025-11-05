@@ -5,6 +5,7 @@ import json
 from markupsafe import Markup
 from dotenv import load_dotenv
 import re
+import re
 from markupsafe import Markup
 
 load_dotenv()
@@ -27,35 +28,62 @@ NON_LLM_AGENTS = {
 }
 
 
-# --------------------------------------------------
-# CLASSIFY PROMPT
-# --------------------------------------------------
-def classify_prompt(prompt: str) -> str:
-    """Classify prompt type based on keywords."""
-    prompt = prompt.lower()
 
-    if any(k in prompt for k in ["career", "job role", "profession", "scope", "salary"]):
+# ==================== CLASSIFIER ====================
+def classify_prompt(prompt: str) -> str:
+    """Identify the user's intent (LLM vs ML agent)."""
+    prompt = prompt.lower().strip()
+
+    # 🔹 JOB RECOMMENDATION INTENT
+    job_keywords = [
+        "job", "jobs", "recommendation", "recommendations",
+        "top job", "top jobs", "best job",
+        "best career", "suggest job", "suggest me job",
+        "career prediction", "which job", "job role",
+        "my top job", "find job", "career path"
+    ]
+    if any(k in prompt for k in job_keywords):
+        print("🎯 Detected JOB intent")
+        return "job"
+
+    # 🔹 Career exploration
+    if any(k in prompt for k in ["career", "profession", "scope", "salary"]):
         return "career"
+
+    # 🔹 Roadmap
     elif any(k in prompt for k in ["roadmap", "steps", "plan", "path"]):
         return "roadmap"
+
+    # 🔹 LinkedIn Post
     elif any(k in prompt for k in ["linkedin", "post", "content", "write"]):
         return "linkedin"
+
+    # 🔹 Fact-check
     elif any(k in prompt for k in ["fact", "true or false", "verify", "check"]):
         return "factcheck"
+
+    # 🔹 Research
     elif any(k in prompt for k in ["research", "find", "study", "analyze"]):
         return "research"
-    elif any(k in prompt for k in ["subject", "elective", "semester", "recommend course", "suggest course"]):
+
+    # 🔹 Subject recommendation
+    elif any(k in prompt for k in ["subject", "semester", "recommend subjects"]):
         return "subject"
-    elif any(k in prompt for k in ["recommend", "placement", "top job", "suggest jobs"]):
-        return "job"
-    elif any(k in prompt for k in ["skill", "strength", "weakness", "profile"]):
+
+    # 🔹 Skills analysis
+    elif any(k in prompt for k in ["skill", "profile", "strengths", "weakness"]):
         return "skills"
+
+    # 🔹 Market demand
     elif any(k in prompt for k in ["market", "demand", "trend", "score"]):
         return "market"
-    elif any(k in prompt for k in ["mooc", "nptel", "course mapping", "pdf", "subject code"]):
+
+    # 🔹 MOOC Mapping
+    elif any(k in prompt for k in ["mooc", "nptel", "course mapping", "pdf", "subject code", "department", "credits"]):
         return "mooc"
-    else:
-        return "unknown"
+
+    print("⚠️ Unknown task type detected")
+    return "unknown"
 
 
 # --------------------------------------------------
@@ -85,23 +113,46 @@ def run_llm_agent(agent_key: str, prompt: str):
 
 def run_non_llm_agent(agent_key: str, username=None, last_user_message=None):
     """Run non-LLM ML-based agents (job, subject, skills, etc.)."""
+    # ---------------- JOB RECOMMENDATION ----------------
     if agent_key == "job":
         from agents.job_recommendation import recommend_jobs
-        return recommend_jobs()
+        username = username or "Guest"
+        print(f"🚀 Running job recommendation for {username}...")
+        jobs = recommend_jobs(username)
+    
+        if isinstance(jobs, list):
+            html = "<b>💼 Top Job Recommendations for You:</b><br><ul>"
+            for j in jobs:
+                html += f"<li>{j}</li>"
+            html += "</ul>"
+            return Markup(html)
+        return str(jobs)
+
 
     elif agent_key == "skills":
         from agents.skill_profiler_agent import run_skill_profiler
         print("🎯 Running Skill Profiler...")
-        profile = run_skill_profiler("data/subjects.xlsx", username)
+        profile = run_skill_profiler(username, "data/subjects.xlsx")
         return "✅ Skill profiler completed successfully."
 
     elif agent_key == "market":
         from agents.market_score_agent import MarketScoreAgent
+        subject = None
+        if isinstance(last_user_message, str):
+        # Try extracting subject name from user query
+            import re
+            match = re.search(r"for\s+(.+)", last_user_message, re.IGNORECASE)
+            if match:
+                subject = match.group(1).strip()
+        if not subject:
+            subject = "Artificial Intelligence"  # Default fallback
+
         agent = MarketScoreAgent()
-        result = agent.get_score("Artificial Intelligence")
-        return json.dumps(result, indent=2)
+        return agent.get_score(subject)
+
 
     elif agent_key == "subject":
+        import re
         from agents.recommendation_agent import run_recommendation_agent
 
         # 🧠 Safely detect semester number
