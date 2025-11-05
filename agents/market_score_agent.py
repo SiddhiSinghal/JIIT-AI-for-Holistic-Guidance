@@ -4,7 +4,7 @@ import sys
 import os
 
 # Ensure project root is on sys.path so top-level packages like `agents` can be imported
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+#sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.ai_utils import get_subject_market_score
 
 def interpret_market_score(score: float) -> str:

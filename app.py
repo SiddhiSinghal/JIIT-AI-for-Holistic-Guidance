@@ -8,6 +8,16 @@ import re
 import orchestrator_cli
 from summer_project.rag_chain import get_mental_health_response
 
+from utils.ai_utils import (
+    map_subject_to_skills, get_subject_market_score,
+    build_student_skill_profile,
+    score_subject_for_student,
+    GRADE_MAP,
+    compute_subject_score,
+    compute_combined_recommendation_score,
+    compute_local_strength_score,
+)
+from utils.skills import SKILL_LABELS
 
 # ==================== FLASK & MONGO SETUP ====================
 app = Flask(__name__)
