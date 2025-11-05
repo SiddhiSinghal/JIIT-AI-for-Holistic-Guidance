@@ -4,3 +4,4 @@ venv/
 instance/*.db
 .env
 user_scores.csv
+cache/

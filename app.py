@@ -186,66 +186,57 @@ def profile():
 
 
 # ==================== UNIFIED CHAT (CAREER + MENTAL) ====================
+from markupsafe import Markup
+
 @app.route("/chat", methods=["GET", "POST"])
 def unified_chat():
     if "user" not in session:
         return redirect(url_for("login"))
 
     username = session["user"]
+
+    # Load small chat history safely (without large data)
     chat_history = session.get("chat_history", [])
 
+    ai_reply = None  # store last message to render directly
+
     if request.method == "POST":
-        user_message = request.form["prompt"].strip()
-        if not user_message:
-            flash("⚠️ Please enter a message.")
-            return redirect(url_for("unified_chat"))
+        user_message = request.form["prompt"]
+        chat_history.append({"sender": "user", "text": user_message})
 
-        # 🧠 Add user message to chat history
-        chat_history.append({"sender": "user", "text": user_message, "html": False})
-
-        # 🔹 Detect if user seems emotionally low → redirect to mental health model
-        stress_keywords = [
-            "tired", "stressed", "sad", "depressed", "done",
-            "fed up", "hopeless", "burnout", "anxious", "lonely"
-        ]
+        # Detect if message is emotional → mental chat
+        stress_keywords = ["tired", "stressed", "sad", "depressed", "done", "fed up", "hopeless", "burnout"]
 
         try:
             if any(word in user_message.lower() for word in stress_keywords):
-                # 💬 Empathetic mental health response
                 ai_reply = get_mental_health_response(user_message)
-
             else:
-                # 🧭 Route to appropriate LLM or ML agent
-                task_type = orchestrator_cli.classify_prompt(user_message)
-
-                if task_type in orchestrator_cli.LLM_AGENTS:
-                    ai_reply = orchestrator_cli.run_llm_agent(task_type, user_message)
-
-                elif task_type in orchestrator_cli.NON_LLM_AGENTS:
-                    ai_reply = orchestrator_cli.run_non_llm_agent(task_type, username=username)
-
-                else:
-                    ai_reply = (
-                        "🤖 I'm here to help — could you tell me whether this is about your "
-                        "<b>career</b> or <b>mental well-being</b>?"
-                    )
-
+                ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
         except Exception as e:
-            ai_reply = f"⚠️ Sorry, there was an error: {str(e)}"
+            ai_reply = f"⚠️ Sorry, there was an error: {e}"
 
-        # 💡 Append AI response (HTML allowed for skill charts, job lists, etc.)
-        chat_history.append({"sender": "ai", "text": Markup(ai_reply), "html": True})
+        # Show reply but don't store large outputs in session
+        if isinstance(ai_reply, Markup):
+            chat_history.append({"sender": "ai", "text": str(ai_reply), "html": True})
+        else:
+            chat_history.append({"sender": "ai", "text": str(ai_reply), "html": False})
 
-        # Save updated conversation
-        session["chat_history"] = chat_history
-        return redirect(url_for("unified_chat"))
+        # ✅ Keep only the last few small messages to avoid cookie overflow
+        session["chat_history"] = chat_history[-10:]
 
-    # Render chat template
+        # ⚡ Directly render page instead of redirecting
+        return render_template(
+            "chat.html",
+            user=username,
+            chat_history=chat_history,
+            chat_type="Unified"
+        )
+
     return render_template(
         "chat.html",
         user=username,
-        chat_type="Unified",
-        chat_history=chat_history
+        chat_history=chat_history,
+        chat_type="Unified"
     )
 
 if __name__ == "__main__":
