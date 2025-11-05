@@ -14,7 +14,8 @@ LLM_AGENTS = {
     "roadmap": "agents.roadmap",
     "linkedin": "agents.linkedin_post_generator",
     "research": "agents.web_researcher",
-    "factcheck": "agents.fact_checker"
+    "factcheck": "agents.fact_checker",
+    "mooc": "agents.mooc"
 }
 
 NON_LLM_AGENTS = {
@@ -46,6 +47,8 @@ def classify_prompt(prompt: str) -> str:
         return "skills"
     elif any(k in prompt for k in ["market", "demand", "trend", "score"]):
         return "market"
+    elif any(k in prompt for k in ["mooc", "nptel", "course mapping", "pdf", "subject code", "department", "credits"]):    
+        return "mooc"
     else:
         return "unknown"
 
@@ -68,6 +71,10 @@ def run_llm_agent(agent_key: str, prompt: str):
     elif agent_key == "factcheck":
         mod = importlib.import_module(LLM_AGENTS[agent_key])
         result = mod.fact_check(prompt)
+    elif agent_key == "mooc":
+        mod = importlib.import_module(LLM_AGENTS[agent_key])
+        # optional: allow overriding PDF via env var
+        result = mod.run_pdf_mooc_query(prompt, os.getenv("PDF_PATH", "uu.pdf"))
     else:
         result = f"No valid LLM agent found for '{agent_key}'"
     return result
