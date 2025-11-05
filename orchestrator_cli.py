@@ -73,8 +73,10 @@ def run_llm_agent(agent_key: str, prompt: str):
         result = mod.fact_check(prompt)
     elif agent_key == "mooc":
         mod = importlib.import_module(LLM_AGENTS[agent_key])
-        # optional: allow overriding PDF via env var
-        result = mod.run_pdf_mooc_query(prompt, os.getenv("PDF_PATH", "uu.pdf"))
+    # Always look inside agents/ directory
+        pdf_path = os.path.join(os.path.dirname(mod.__file__), "uu.pdf")
+        result = mod.run_pdf_mooc_query(prompt, pdf_path)
+
     else:
         result = f"No valid LLM agent found for '{agent_key}'"
     return result

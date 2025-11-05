@@ -69,6 +69,35 @@
       <div id="parsedResults" class="mt-3"></div>
     </div>
   </div>
+  <div id="parsedResults" class="mt-4">
+  <h6 class="fw-bold mb-2">📘 Uploaded Results</h6>
+  {% for upload in user.uploads %}
+  <div class="card mb-3 shadow-sm">
+    <div class="card-body">
+      <h6 class="card-title">Semester {{ upload.semester }}</h6>
+      <p class="card-text">
+        SGPA: <strong>{{ upload.sgpa }}</strong> | 
+        CGPA: <strong>{{ upload.cgpa }}</strong>
+      </p>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr><th>Code</th><th>Subject</th><th>Grade</th><th>Points</th></tr>
+        </thead>
+        <tbody>
+          {% for sub in upload.subjects %}
+          <tr>
+            <td>{{ sub.code }}</td>
+            <td>{{ sub.name }}</td>
+            <td>{{ sub.grade }}</td>
+            <td>{{ sub.grade_point }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script>

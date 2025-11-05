@@ -8,7 +8,6 @@ app = Flask(__name__)
 app.secret_key = "super_secret_key"
 
 # === MongoDB Setup ===
-# Replace with your Atlas URI if needed
 client = MongoClient("mongodb://localhost:27017/")
 db = client["holistic_guidance"]
 users_collection = db["users"]
@@ -73,19 +72,33 @@ def logout():
 
 @app.route("/career_chat", methods=["GET", "POST"])
 def career_chat():
+    """
+    Career Chat route – handles LLM tasks including MOOC DeepSeek RAG queries.
+    """
     if "user" not in session:
         return redirect(url_for("login"))
 
     result = None
+    error = None
+
     if request.method == "POST":
         prompt = request.form["prompt"]
         task_type = orchestrator_cli.classify_prompt(prompt)
-        if task_type in orchestrator_cli.LLM_AGENTS:
-            result = orchestrator_cli.run_llm_agent(task_type, prompt)
-        else:
-            result = "❌ Unknown task type."
 
-    return render_template("career_chat.html", user=session["user"], result=result)
+        try:
+            if task_type in orchestrator_cli.LLM_AGENTS:
+                result = orchestrator_cli.run_llm_agent(task_type, prompt)
+            else:
+                result = "❌ Unknown task type."
+        except Exception as e:
+            error = f"⚠️ Error: {str(e)}"
+
+    return render_template(
+        "career_chat.html",
+        user=session["user"],
+        result=result,
+        error=error
+    )
 
 
 @app.route("/mental_chat", methods=["GET", "POST"])
@@ -99,6 +112,24 @@ def mental_chat():
         result = get_mental_health_response(prompt)
 
     return render_template("mental_chat.html", user=session["user"], result=result)
+
+
+# ==================== FILE UPLOAD (optional, for MOOC PDF change) ====================
+
+@app.route("/upload", methods=["POST"])
+def upload_pdf():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    uploaded_file = request.files.get("pdf_file")
+    if uploaded_file and uploaded_file.filename.endswith(".pdf"):
+        save_path = os.path.join(os.getcwd(), uploaded_file.filename)
+        uploaded_file.save(save_path)
+        os.environ["PDF_PATH"] = save_path
+        flash(f"PDF uploaded successfully: {uploaded_file.filename}")
+    else:
+        flash("Please upload a valid PDF file.")
+    return redirect(url_for("career_chat"))
 
 
 # ==================== MAIN ====================
