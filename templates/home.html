@@ -2,58 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Holistic AI - Home</title>
+  <title>Welcome, {{ user }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background-color: #f8f9fa; }
-    .container { margin-top: 80px; }
-    .card {
-      border-radius: 15px;
-      transition: 0.3s;
-    }
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
+    body { background: #f5f7fa; text-align: center; margin-top: 120px; }
+    .card { max-width: 500px; margin: auto; padding: 20px; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
-  <div class="container text-center">
-    <h2>Welcome back, {{ user }} 👋</h2>
-    <p class="mb-4 text-muted">Choose what you’d like to explore today</p>
-
-    <div class="row justify-content-center">
-      <div class="col-md-3">
-        <a href="/career_chat" class="text-decoration-none">
-          <div class="card p-4">
-            <h5>💼 Career Chat</h5>
-            <p>Get AI-based job recommendations</p>
-          </div>
-        </a>
-      </div>
-
-      <div class="col-md-3">
-        <a href="/mental_chat" class="text-decoration-none">
-          <div class="card p-4">
-            <h5>🧠 Mental Health Chat</h5>
-            <p>Talk with your AI wellness guide</p>
-          </div>
-        </a>
-      </div>
-
-      <div class="col-md-3">
-        <a href="/profile" class="text-decoration-none">
-          <div class="card p-4">
-            <h5>👤 Profile</h5>
-            <p>View marksheets and update details</p>
-          </div>
-        </a>
-      </div>
-    </div>
-
-    <div class="mt-4">
-      <a href="/logout" class="btn btn-danger">Logout</a>
+  <div class="card">
+    <h2>👋 Welcome, {{ user }}!</h2>
+    <p>What would you like to do today?</p>
+    <div class="d-grid gap-2 mt-4">
+      <a href="/chat" class="btn btn-primary btn-lg">💬 Start Chat</a>
+      <a href="/profile" class="btn btn-outline-secondary btn-lg">📄 View Profile</a>
+      <a href="/logout" class="btn btn-danger btn-lg">🚪 Logout</a>
     </div>
   </div>
 </body>

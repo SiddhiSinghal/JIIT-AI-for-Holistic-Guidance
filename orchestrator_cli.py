@@ -35,7 +35,7 @@ def classify_prompt(prompt: str) -> str:
     # 🔹 JOB RECOMMENDATION INTENT
     job_keywords = [
         "job", "jobs", "recommendation", "recommendations",
-        "placement", "top job", "top jobs", "best job",
+        "top job", "top jobs", "best job",
         "best career", "suggest job", "suggest me job",
         "career prediction", "which job", "job role",
         "my top job", "find job", "career path"

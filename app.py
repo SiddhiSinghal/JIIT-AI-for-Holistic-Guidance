@@ -8,6 +8,7 @@ import re
 import orchestrator_cli
 from summer_project.rag_chain import get_mental_health_response
 
+# ==== Import from utils for later integration ====
 from utils.ai_utils import (
     map_subject_to_skills, get_subject_market_score,
     build_student_skill_profile,
@@ -18,6 +19,7 @@ from utils.ai_utils import (
     compute_local_strength_score,
 )
 from utils.skills import SKILL_LABELS
+
 
 # ==================== FLASK & MONGO SETUP ====================
 app = Flask(__name__)
@@ -39,19 +41,9 @@ def allowed_file(filename):
 
 
 def extract_marks_from_pdf(filepath):
-    """
-    Extracts semester, branch, SGPA, CGPA, and subject-grade pairs
-    from JIIT-style marksheet PDFs (like sem6.pdf).
-    """
-    import fitz
-    import re
-
+    """Extracts subject and grade pairs (and optional sem, branch, sgpa, cgpa)"""
     doc = fitz.open(filepath)
-    text = ""
-    for page in doc:
-        text += page.get_text("text")
-
-    # Normalize whitespace
+    text = "".join([page.get_text("text") for page in doc])
     text = re.sub(r'\s+', ' ', text)
 
     data = {
@@ -62,17 +54,14 @@ def extract_marks_from_pdf(filepath):
         "subjects": []
     }
 
-    # 🔹 Extract Semester
-    sem_match = re.search(r"Stynumber\s*[:\-]?\s*(\d+)", text, re.IGNORECASE)
-    if sem_match:
-        data["semester"] = sem_match.group(1)
-
-    # 🔹 Extract Branch
     branch_match = re.search(r"Program\s*\(Branch\)\s*[:\-]?\s*([A-Za-z\s&().]+)", text, re.IGNORECASE)
     if branch_match:
         data["branch"] = branch_match.group(1).strip()
 
-    # 🔹 Extract SGPA and CGPA
+    sem_match = re.search(r"Semester\s*[:\-]?\s*(\d+)", text, re.IGNORECASE)
+    if sem_match:
+        data["semester"] = sem_match.group(1)
+
     sgpa_match = re.search(r"Student\s*Sgpa\s*[:\-]?\s*([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
     cgpa_match = re.search(r"Student\s*Cgpa\s*[:\-]?\s*([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
 
@@ -81,7 +70,6 @@ def extract_marks_from_pdf(filepath):
     if cgpa_match:
         data["cgpa"] = float(cgpa_match.group(1))
 
-    # 🔹 Extract subjects and grades
     pattern = re.compile(
         r"\d+\s+[A-Z0-9]+\s+([A-Za-z&\-/().\s]+?)\s+\d+\s+\d+\.\d+\s+\d+\.\d+\s+\d+\.\d+\s+\d+\.\d+\s+([ABCOP][\+\-]?)\s+Pass",
         re.IGNORECASE
@@ -93,20 +81,19 @@ def extract_marks_from_pdf(filepath):
         grade = match[1].strip().upper()
         data["subjects"].append({"subject": subject, "grade": grade})
 
-    print("✅ Extracted Data:", data)  # debug
     return data
-
 
 
 # ==================== AUTH ROUTES ====================
 @app.route("/")
 def home():
+    # If user is logged in, show a small dashboard with links
     if "user" in session:
-        # If logged in, show a small dashboard/home
         return render_template("home.html", user=session["user"])
     else:
-        # If not logged in, show landing page with login/signup
+        # If not logged in, show the welcome page with login/signup buttons
         return render_template("index.html")
+
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -142,7 +129,8 @@ def login():
         user = users_collection.find_one({"username": username})
         if user and check_password_hash(user["password"], password):
             session["user"] = username
-            return redirect(url_for("career_chat"))
+            session["chat_history"] = []
+            return redirect(url_for("unified_chat"))
         else:
             flash("Invalid credentials!")
     return render_template("login.html")
@@ -153,81 +141,6 @@ def logout():
     session.pop("user", None)
     flash("Logged out successfully.")
     return redirect(url_for("login"))
-
-
-# ==================== CHAT ROUTES ====================
-@app.route("/career_chat", methods=["GET", "POST"])
-def career_chat():
-    if "user" not in session:
-        return redirect(url_for("login"))
-
-    # Load chat history if exists, else create empty list
-    chat_history = session.get("chat_history", [])
-
-    if request.method == "POST":
-        prompt = request.form["prompt"]
-
-        # Save user message
-        chat_history.append({"sender": "user", "text": prompt})
-
-        # Classify and run appropriate agent
-        task_type = orchestrator_cli.classify_prompt(prompt)
-
-        if task_type in orchestrator_cli.LLM_AGENTS:
-            ai_reply = orchestrator_cli.run_llm_agent(task_type, prompt)
-        elif task_type in orchestrator_cli.NON_LLM_AGENTS:
-            ai_reply = orchestrator_cli.run_non_llm_agent(task_type)
-        else:
-            ai_reply = "⚠️ I’m not sure how to handle that request yet."
-
-        # Save AI response
-        chat_history.append({"sender": "ai", "text": ai_reply})
-
-        # Store back in session
-        session["chat_history"] = chat_history
-
-        return redirect(url_for("career_chat"))
-
-    return render_template("chat.html",
-                           user=session["user"],
-                           chat_type="Career",
-                           chat_history=chat_history)
-
-
-
-@app.route("/mental_chat", methods=["GET", "POST"])
-def mental_chat():
-    if "user" not in session:
-        return redirect(url_for("login"))
-
-    # Load chat history from session or create new
-    chat_history = session.get("mental_chat_history", [])
-
-    if request.method == "POST":
-        prompt = request.form["prompt"]
-
-        # Save user message
-        chat_history.append({"sender": "user", "text": prompt})
-
-        # Get AI (mental health) response
-        try:
-            ai_reply = get_mental_health_response(prompt)
-        except Exception as e:
-            ai_reply = f"⚠️ Sorry, there was an error processing your message: {str(e)}"
-
-        # Save AI response
-        chat_history.append({"sender": "ai", "text": ai_reply})
-
-        # Store chat back into session
-        session["mental_chat_history"] = chat_history
-
-        return redirect(url_for("mental_chat"))
-
-    return render_template("chat.html",
-                           user=session["user"],
-                           chat_type="Mental Health",
-                           chat_history=chat_history)
-
 
 
 # ==================== PROFILE ROUTE ====================
@@ -241,7 +154,6 @@ def profile():
 
     if request.method == "POST":
         file = request.files.get("file")
-
         if not file or file.filename == "":
             flash("⚠️ No file selected!")
             return redirect(request.url)
@@ -252,14 +164,16 @@ def profile():
             file.save(filepath)
 
             extracted_data = extract_marks_from_pdf(filepath)
-            print("Extracted Data:", extracted_data)
-
-            # ✅ Only store subjects
             users_collection.update_one(
                 {"username": username},
-                {"$push": {"marksheets": {"filename": filename, "subjects": extracted_data["subjects"]}}}
+                {"$push": {"marksheets": {
+                    "semester": extracted_data["semester"],
+                    "branch": extracted_data["branch"],
+                    "sgpa": extracted_data["sgpa"],
+                    "cgpa": extracted_data["cgpa"],
+                    "subjects": extracted_data["subjects"]
+                }}}
             )
-
             flash("✅ Marksheet processed successfully!")
             return redirect(url_for("profile"))
         else:
@@ -268,6 +182,38 @@ def profile():
     user_data = users_collection.find_one({"username": username}, {"_id": 0})
     return render_template("profile.html", user_data=user_data, user=username)
 
+
+# ==================== UNIFIED CHAT (CAREER + MENTAL) ====================
+@app.route("/chat", methods=["GET", "POST"])
+def unified_chat():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    username = session["user"]
+    chat_history = session.get("chat_history", [])
+
+    if request.method == "POST":
+        user_message = request.form["prompt"]
+        chat_history.append({"sender": "user", "text": user_message})
+
+        # 🔹 Detect if emotional message (redirect to mental health)
+        stress_keywords = ["tired", "stressed", "sad", "depressed", "done", "fed up", "hopeless", "burnout"]
+        if any(word in user_message.lower() for word in stress_keywords):
+            ai_reply = get_mental_health_response(user_message)
+        else:
+            task_type = orchestrator_cli.classify_prompt(user_message)
+            if task_type in orchestrator_cli.LLM_AGENTS:
+                ai_reply = orchestrator_cli.run_llm_agent(task_type, user_message)
+            elif task_type in orchestrator_cli.NON_LLM_AGENTS:
+                ai_reply = orchestrator_cli.run_non_llm_agent(task_type)
+            else:
+                ai_reply = "🤖 I'm here to help — is this about your career or how you’re feeling today?"
+
+        chat_history.append({"sender": "ai", "text": ai_reply})
+        session["chat_history"] = chat_history
+        return redirect(url_for("unified_chat"))
+
+    return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
 
 
 # ==================== RUN SERVER ====================
