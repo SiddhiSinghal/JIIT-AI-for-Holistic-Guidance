@@ -102,8 +102,11 @@ def extract_marks_from_pdf(filepath):
 @app.route("/")
 def home():
     if "user" in session:
-        return redirect(url_for("career_chat"))
-    return redirect(url_for("login"))
+        # If logged in, show a small dashboard/home
+        return render_template("home.html", user=session["user"])
+    else:
+        # If not logged in, show landing page with login/signup
+        return render_template("index.html")
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -158,16 +161,38 @@ def career_chat():
     if "user" not in session:
         return redirect(url_for("login"))
 
-    result = None
+    # Load chat history if exists, else create empty list
+    chat_history = session.get("chat_history", [])
+
     if request.method == "POST":
         prompt = request.form["prompt"]
-        task_type = orchestrator_cli.classify_prompt(prompt)
-        if task_type in orchestrator_cli.LLM_AGENTS:
-            result = orchestrator_cli.run_llm_agent(task_type, prompt)
-        else:
-            result = "❌ Unknown task type."
 
-    return render_template("chat.html", user=session["user"], chat_type="Career", result=result)
+        # Save user message
+        chat_history.append({"sender": "user", "text": prompt})
+
+        # Classify and run appropriate agent
+        task_type = orchestrator_cli.classify_prompt(prompt)
+
+        if task_type in orchestrator_cli.LLM_AGENTS:
+            ai_reply = orchestrator_cli.run_llm_agent(task_type, prompt)
+        elif task_type in orchestrator_cli.NON_LLM_AGENTS:
+            ai_reply = orchestrator_cli.run_non_llm_agent(task_type)
+        else:
+            ai_reply = "⚠️ I’m not sure how to handle that request yet."
+
+        # Save AI response
+        chat_history.append({"sender": "ai", "text": ai_reply})
+
+        # Store back in session
+        session["chat_history"] = chat_history
+
+        return redirect(url_for("career_chat"))
+
+    return render_template("chat.html",
+                           user=session["user"],
+                           chat_type="Career",
+                           chat_history=chat_history)
+
 
 
 @app.route("/mental_chat", methods=["GET", "POST"])
@@ -175,12 +200,34 @@ def mental_chat():
     if "user" not in session:
         return redirect(url_for("login"))
 
-    result = None
+    # Load chat history from session or create new
+    chat_history = session.get("mental_chat_history", [])
+
     if request.method == "POST":
         prompt = request.form["prompt"]
-        result = get_mental_health_response(prompt)
 
-    return render_template("chat.html", user=session["user"], chat_type="Mental", result=result)
+        # Save user message
+        chat_history.append({"sender": "user", "text": prompt})
+
+        # Get AI (mental health) response
+        try:
+            ai_reply = get_mental_health_response(prompt)
+        except Exception as e:
+            ai_reply = f"⚠️ Sorry, there was an error processing your message: {str(e)}"
+
+        # Save AI response
+        chat_history.append({"sender": "ai", "text": ai_reply})
+
+        # Store chat back into session
+        session["mental_chat_history"] = chat_history
+
+        return redirect(url_for("mental_chat"))
+
+    return render_template("chat.html",
+                           user=session["user"],
+                           chat_type="Mental Health",
+                           chat_history=chat_history)
+
 
 
 # ==================== PROFILE ROUTE ====================

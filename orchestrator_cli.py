@@ -5,6 +5,7 @@ import os
 import json
 import subprocess
 from dotenv import load_dotenv
+from flask import session
 
 load_dotenv()
 
@@ -26,103 +27,127 @@ NON_LLM_AGENTS = {
 }
 
 
+# ==================== CLASSIFIER ====================
 def classify_prompt(prompt: str) -> str:
-    """Roughly classify prompt type based on keywords."""
-    prompt = prompt.lower()
-    if any(k in prompt for k in ["career", "job role", "profession", "scope", "salary"]):
+    """Identify the user's intent (LLM vs ML agent)."""
+    prompt = prompt.lower().strip()
+
+    # 🔹 JOB RECOMMENDATION INTENT
+    job_keywords = [
+        "job", "jobs", "recommendation", "recommendations",
+        "placement", "top job", "top jobs", "best job",
+        "best career", "suggest job", "suggest me job",
+        "career prediction", "which job", "job role",
+        "my top job", "find job", "career path"
+    ]
+    if any(k in prompt for k in job_keywords):
+        print("🎯 Detected JOB intent")
+        return "job"
+
+    # 🔹 Career exploration
+    if any(k in prompt for k in ["career", "profession", "scope", "salary"]):
         return "career"
+
+    # 🔹 Roadmap
     elif any(k in prompt for k in ["roadmap", "steps", "plan", "path"]):
         return "roadmap"
+
+    # 🔹 LinkedIn Post
     elif any(k in prompt for k in ["linkedin", "post", "content", "write"]):
         return "linkedin"
+
+    # 🔹 Fact-check
     elif any(k in prompt for k in ["fact", "true or false", "verify", "check"]):
         return "factcheck"
+
+    # 🔹 Research
     elif any(k in prompt for k in ["research", "find", "study", "analyze"]):
         return "research"
-    elif any(k in prompt for k in ["subject", "semester", "recommend"]):
+
+    # 🔹 Subject recommendation
+    elif any(k in prompt for k in ["subject", "semester", "recommend subjects"]):
         return "subject"
-    elif any(k in prompt for k in ["recommend", "suggest jobs", "placement"]):
-        return "job"
+
+    # 🔹 Skills analysis
     elif any(k in prompt for k in ["skill", "profile", "strengths", "weakness"]):
         return "skills"
+
+    # 🔹 Market demand
     elif any(k in prompt for k in ["market", "demand", "trend", "score"]):
         return "market"
-    elif any(k in prompt for k in ["mooc", "nptel", "course mapping", "pdf", "subject code", "department", "credits"]):    
+
+    # 🔹 MOOC Mapping
+    elif any(k in prompt for k in ["mooc", "nptel", "course mapping", "pdf", "subject code", "department", "credits"]):
         return "mooc"
-    else:
-        return "unknown"
+
+    print("⚠️ Unknown task type detected")
+    return "unknown"
 
 
+# ==================== LLM AGENTS ====================
 def run_llm_agent(agent_key: str, prompt: str):
-    """Run LLM-based agent depending on key."""
+    """Run LLM-based agents."""
+    if agent_key not in LLM_AGENTS:
+        return f"❌ Unknown LLM agent: {agent_key}"
+
+    mod = importlib.import_module(LLM_AGENTS[agent_key])
+
     if agent_key == "career":
-        mod = importlib.import_module(LLM_AGENTS[agent_key])
-        result = mod.get_career_info(prompt)
+        return mod.get_career_info(prompt)
     elif agent_key == "roadmap":
-        mod = importlib.import_module(LLM_AGENTS[agent_key])
-        # Dummy user scores
-        result = mod.get_roadmap(prompt, {"DSA": 8, "Math": 7}, weeks=10)
+        return mod.get_roadmap(prompt, {"DSA": 8, "Math": 7}, weeks=10)
     elif agent_key == "linkedin":
-        mod = importlib.import_module(LLM_AGENTS[agent_key])
-        result = mod.generate_linkedin_post("AI", ["LLMs are transforming industry", "Focus on practical application"])
+        return mod.generate_linkedin_post("AI", ["LLMs are transforming industry", "Focus on practical application"])
     elif agent_key == "research":
-        mod = importlib.import_module(LLM_AGENTS[agent_key])
-        result = mod.run_research(prompt)
+        return mod.run_research(prompt)
     elif agent_key == "factcheck":
-        mod = importlib.import_module(LLM_AGENTS[agent_key])
-        result = mod.fact_check(prompt)
+        return mod.fact_check(prompt)
     elif agent_key == "mooc":
-        mod = importlib.import_module(LLM_AGENTS[agent_key])
-    # Always look inside agents/ directory
         pdf_path = os.path.join(os.path.dirname(mod.__file__), "uu.pdf")
-        result = mod.run_pdf_mooc_query(prompt, pdf_path)
-
+        return mod.run_pdf_mooc_query(prompt, pdf_path)
     else:
-        result = f"No valid LLM agent found for '{agent_key}'"
-    return result
+        return f"No handler implemented for {agent_key}"
 
 
+# ==================== NON-LLM AGENTS ====================
 def run_non_llm_agent(agent_key: str):
-    """Run non-LLM ML-based agent."""
+    """Run non-LLM (ML) agents like job recommender."""
     if agent_key == "job":
-        # mod = importlib.import_module(NON_LLM_AGENTS[agent_key])
-        # result = mod.recommend_jobs()
-        print("🚀 Redirecting to Job Agent...")
-        script_path = os.path.join("agents", "app.py")
-        subprocess.run([sys.executable, script_path])
-        return "✅ Job Agent executed successfully."
-    
-    if agent_key == "skills":
-        # mod = importlib.import_module(NON_LLM_AGENTS[agent_key])
-        # result = mod.profile_skills({"DSA": 8, "CN": 6, "Aptitude": 7})
+        from agents.job_recommendation import recommend_jobs
+        username = session.get("user")
+        print(f"🚀 Running job recommendation for user: {username}")
+        result = recommend_jobs(username)
+        return result
+
+    elif agent_key == "skills":
         print("🚀 Launching Skill Profiler Agent...")
         script_path = os.path.join("agents", "skill_profiler_agent.py")
         subprocess.run([sys.executable, script_path])
         return "✅ Skill Profiler Agent executed successfully."
-    
+
     elif agent_key == "subject":
-        print("Your recommended subjects")
+        print("📘 Generating recommended subjects...")
         script_path = os.path.join("agents", "recommendation_agent.py")
         subprocess.run([sys.executable, script_path])
         return "✅ Subject Recommendation Agent executed successfully."
 
-
     elif agent_key == "market":
         mod = importlib.import_module(NON_LLM_AGENTS[agent_key])
-        result = mod.get_market_score("AI Engineer")
+        return mod.get_market_score("AI Engineer")
+
     else:
-        result = f"No valid ML agent found for '{agent_key}'"
-    return result
+        return f"⚠️ No valid ML agent found for '{agent_key}'"
 
 
+# ==================== ORCHESTRATOR ====================
 def orchestrate(prompt: str):
-    """Main orchestrator logic for CLI"""
+    """Main orchestrator logic for chat or CLI."""
     print("\n🧠 Classifying task type...")
     task_type = classify_prompt(prompt)
 
     if task_type == "unknown":
         print("⚠️ Could not determine which agent to use.")
-        return
+        return "⚠️ Could not determine task type."
 
     if task_type in LLM_AGENTS:
         print(f"🧩 Using LLM-based agent: {task_type}")
@@ -136,10 +161,13 @@ def orchestrate(prompt: str):
     print("\n✅ Result:")
     try:
         print(json.dumps(result, indent=2, ensure_ascii=False))
-    except:
+    except Exception:
         print(result)
 
+    return result
 
+
+# ==================== CLI MODE ====================
 if __name__ == "__main__":
     print("=== 🤖 Multi-Agent CLI Orchestrator ===")
     user_prompt = input("\nEnter your query: ").strip()
