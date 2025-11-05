@@ -26,9 +26,19 @@ python-dotenv
 # Additional utilities
 requests
 
+# Database
+pymongo
+
+# PDF Processing
+pymupdf
+
+# Additional dependencies
 Flask==2.3.5
 Flask-Login==0.6.2
 Flask-SQLAlchemy==3.0.5
 python-dotenv==1.0.0
 openai==1.29.0
 psycopg2-binary==2.9.9
+langchain
+langchain-community
+chromadb
