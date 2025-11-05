@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block content %}
+<h3>{{ chat_type }} Guidance Chat</h3>
+<div id="chat-box" class="border p-3 mb-3 bg-white rounded" style="height:60vh; overflow-y:auto;">
+  {% if result %}
+  <div class="alert alert-info"><b>AI:</b> {{ result }}</div>
+  {% endif %}
+</div>
+
+<form method="POST" class="d-flex">
+  <input type="text" name="prompt" class="form-control me-2" placeholder="Type your message..." required>
+  <button class="btn btn-primary">Send</button>
+</form>
+{% endblock %}
