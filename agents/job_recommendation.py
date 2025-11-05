@@ -1,9 +1,21 @@
 # job_recommendation.py
 import pickle
 import pandas as pd
-from models import UserScores
-from flask_login import current_user
+from pymongo import MongoClient
+from flask import session
 
+# === Connect to MongoDB ===
+client = MongoClient("mongodb://localhost:27017/")
+db = client["holistic_guidance"]
+users_collection = db["users"]
+
+# === Grade to numeric mapping ===
+GRADE_TO_MARKS = {
+    "A+": 100, "A": 90, "B+": 80, "B": 70,
+    "C+": 60, "C": 50, "D": 40, "F": 0
+}
+
+# === Load model + encoder ===
 def load_model_and_encoder():
     with open("agents/job_model.pkl", "rb") as f:
         model = pickle.load(f)
@@ -11,30 +23,71 @@ def load_model_and_encoder():
         encoder = pickle.load(f)
     return model, encoder
 
-def recommend_jobs():
+
+# === Extract marks from stored marksheets ===
+def get_subject_marks_from_mongo(username):
+    """
+    Fetch the latest marksheet data for the logged-in user
+    and compute subject-wise numeric scores.
+    """
+
+    user = users_collection.find_one({"username": username})
+    if not user or "marksheets" not in user or len(user["marksheets"]) == 0:
+        return None
+
+    # Get latest uploaded marksheet
+    latest = user["marksheets"][-1]
+
+    # Map of subject keywords to model feature names
+    subject_map = {
+        "dsa": ["data structures", "dsa"],
+        "dbms": ["dbms", "database"],
+        "os": ["operating system", "os"],
+        "cn": ["computer networks", "network"],
+        "math": ["math", "applied mathematics"],
+        "aptitude": ["aptitude", "reasoning", "statistics"],
+        "comm": ["communication", "english", "writing"],
+        "problem_solving": ["problem", "logic"],
+        "creative": ["creative", "design", "innovation"],
+        "hackathons": ["project", "hackathon", "workshop"]
+    }
+
+    # Default marks (0 for missing)
+    marks = {k: 0 for k in subject_map.keys()}
+
+    # Loop over subjects and map grades
+    for subj in latest.get("subjects", []):
+        name = subj["subject"].lower()
+        grade = subj["grade"].upper()
+        score = GRADE_TO_MARKS.get(grade, 0)
+
+        for key, keywords in subject_map.items():
+            if any(word in name for word in keywords):
+                # Take the max grade if multiple subjects fit one category
+                marks[key] = max(marks[key], score)
+
+    return marks
+
+
+# === Recommend jobs ===
+def recommend_jobs(username):
     model, encoder = load_model_and_encoder()
+    marks = get_subject_marks_from_mongo(username)
 
-    # fetch latest scores of current user
-    latest = (
-        UserScores.query
-        .filter_by(user_id=current_user.id)
-        .order_by(UserScores.timestamp.desc())
-        .first()
-    )
+    if not marks:
+        return ["No marksheet data found! Please upload your grade sheet."]
 
-    if not latest:
-        return []  # return empty list if no scores
-
+    # Build features list in correct order
     features = [
-        latest.dsa, latest.dbms, latest.os,
-        latest.cn, latest.math, latest.aptitude,
-        latest.comm, latest.problem_solving,
-        latest.creative, latest.hackathons
+        marks["dsa"], marks["dbms"], marks["os"],
+        marks["cn"], marks["math"], marks["aptitude"],
+        marks["comm"], marks["problem_solving"],
+        marks["creative"], marks["hackathons"]
     ]
 
-    # Convert to DataFrame to match training features
-    columns = ["DSA","DBMS","OS","CN","Mathmetics","Aptitute","Comm",
-               "Problem Solving","Creative","Hackathons"]
+    columns = ["DSA", "DBMS", "OS", "CN", "Mathmetics", "Aptitute",
+               "Comm", "Problem Solving", "Creative", "Hackathons"]
+
     features_df = pd.DataFrame([features], columns=columns)
 
     if hasattr(model, "predict_proba"):
@@ -45,5 +98,4 @@ def recommend_jobs():
         pred = model.predict(features_df)
         top_3_jobs = encoder.inverse_transform(pred).tolist()
 
-    # ✅ Return a list instead of formatted string
     return top_3_jobs
