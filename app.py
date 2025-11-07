@@ -179,7 +179,7 @@ def profile():
             flash("✅ Marksheet processed successfully!")
             return redirect(url_for("profile"))
         else:
-            flash("❌ Please upload a valid PDF file!")
+            flash(" Please upload a valid PDF file!")
 
     user_data = users_collection.find_one({"username": username}, {"_id": 0})
     return render_template("profile.html", user_data=user_data, user=username)
@@ -195,49 +195,85 @@ def unified_chat():
 
     username = session["user"]
 
-    # Load small chat history safely (without large data)
-    chat_history = session.get("chat_history", [])
+    # 💬 Always start a fresh chat when user opens this page
+    if request.method == "GET":
+        session["chat_history"] = []
 
-    ai_reply = None  # store last message to render directly
+        # 🩵 Initial welcome message
+        welcome_message = """
+        <div style='padding:15px;background:#f1f8ff;border-left:5px solid #007bff;border-radius:10px;'>
+          <b> Hi there! Welcome to your Holistic Guidance Companion</b><br><br>
+          This is your personal space for support through every part of your student journey.<br><br>
+          Whether it’s your <b>studies </b>, <b>career </b>, <b>mental health </b>, or <b>personal growth </b>, 
+          I’m here to guide you toward <b>clarity, confidence, and progress</b>.<br><br>
+          <i>What would you like to begin with today?</i>
+        </div>
+        """
+
+        # Store this as the first message
+        session["chat_history"] = [{"sender": "ai", "text": welcome_message, "html": True}]
+
+        return render_template(
+            "chat.html",
+            user=username,
+            chat_history=session["chat_history"],
+            chat_type="Unified"
+        )
+
+    # ========================
+    # POST request → Handle message
+    # ========================
+    chat_history = session.get("chat_history", [])
+    ai_reply = None
 
     if request.method == "POST":
         user_message = request.form["prompt"]
         chat_history.append({"sender": "user", "text": user_message})
 
-        # Detect if message is emotional → mental chat
-        stress_keywords = ["tired", "stressed", "sad", "depressed", "done", "fed up", "hopeless", "burnout"]
+        # 🔹 Emotion detection → switch to mental health mode
+        stress_keywords = [
+            "tired", "stressed", "sad", "depressed", "done", "fed up",
+            "hopeless", "anxious", "burnout", "lonely", "pressure"
+        ]
 
         try:
             if any(word in user_message.lower() for word in stress_keywords):
                 ai_reply = get_mental_health_response(user_message)
             else:
-                ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
+                ai_reply = orchestrator_cli.orchestrate(
+                    user_message, username=username, last_user_message=user_message
+                )
         except Exception as e:
-            ai_reply = f"⚠️ Sorry, there was an error: {e}"
+            ai_reply = f" Sorry, there was an error: {e}"
 
-        # Show reply but don't store large outputs in session
+        # 🧩 Append AI response
         if isinstance(ai_reply, Markup):
             chat_history.append({"sender": "ai", "text": str(ai_reply), "html": True})
         else:
             chat_history.append({"sender": "ai", "text": str(ai_reply), "html": False})
 
-        # ✅ Keep only the last few small messages to avoid cookie overflow
+        # 🌿 Add a mid-conversation encouragement every 5 user messages
+        user_msgs = [m for m in chat_history if m["sender"] == "user"]
+        if len(user_msgs) % 5 == 0:
+            mid_message = """
+            <div style='padding:10px;background:#e8f5e9;border-left:4px solid #43a047;border-radius:8px;'>
+              I’m really enjoying our conversation!<br>
+              Do you want to continue here, or explore another area like 
+              <b>Studies </b>, <b>Career </b>, <b>Health </b>, or <b>Personal Growth </b>?
+            </div>
+            """
+            chat_history.append({"sender": "ai", "text": mid_message, "html": True})
+
+        # ✅ Keep chat small (avoid cookie overflow)
         session["chat_history"] = chat_history[-10:]
 
-        # ⚡ Directly render page instead of redirecting
+        # ⚡ Render directly
         return render_template(
             "chat.html",
             user=username,
             chat_history=chat_history,
             chat_type="Unified"
         )
-
-    return render_template(
-        "chat.html",
-        user=username,
-        chat_history=chat_history,
-        chat_type="Unified"
-    )
 
 if __name__ == "__main__":
     app.run(debug=True)

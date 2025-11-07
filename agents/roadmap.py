@@ -39,7 +39,7 @@ Ensure the sum of weeks is {weeks}. Return only JSON.
             content = resp.choices[0].message.content
             roadmap = json.loads(content)
         except Exception as e:
-            print("⚠️ OpenAI error:", e)
+            print(" OpenAI error:", e)
 
     # fallback heuristic roadmap if API not available
     if not roadmap:
@@ -62,16 +62,16 @@ Ensure the sum of weeks is {weeks}. Return only JSON.
             roadmap["step_5"]["weeks"] += diff
 
     # ✅ Format into HTML
-    html = f"<b>🧭 Roadmap to Become a {job_role}</b><br><br>"
+    html = f"<b> Roadmap to Become a {job_role}</b><br><br>"
     for i, (step, details) in enumerate(roadmap.items(), start=1):
         task = details.get("task", "")
         step_weeks = details.get("weeks", 1)
         resources = details.get("resources", [])
         html += f"""
         <div style='margin-bottom:15px;padding:10px;background:#f8f9fa;border-left:4px solid #007bff;border-radius:6px;'>
-            <b>🚀 Step {i}:</b> {task}<br>
-            <span style='color:#555;'>⏱️ Duration: {step_weeks} week{'s' if step_weeks > 1 else ''}</span><br>
-            <span style='color:#333;'>📚 Resources:</span><br>
+            <b> Step {i}:</b> {task}<br>
+            <span style='color:#555;'> Duration: {step_weeks} week{'s' if step_weeks > 1 else ''}</span><br>
+            <span style='color:#333;'> Resources:</span><br>
             <ul style='margin-top:4px;margin-bottom:0;'>""" 
         for r in resources:
             html += f"<li><a href='{r}' target='_blank'>{r}</a></li>"
