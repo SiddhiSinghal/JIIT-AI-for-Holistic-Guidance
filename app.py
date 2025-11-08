@@ -195,18 +195,94 @@ def unified_chat():
     # ------------------------ GET (start chat) ------------------------
     if request.method == "GET":
         session["chat_history"] = []
-        session.pop("test_intent", None)  # clear any old test state
-
-        welcome_message = """
-        <div style='padding:15px;background:#f1f8ff;border-left:5px solid #007bff;border-radius:10px;'>
-          <b> Hi there! Welcome to your holistic guidance companion
-            This is your personal space for support through every part of your student journey.
-            Whether it’s your studies, career, health, or personal growth, I’m here to guide you toward clarity, confidence, and progress.
-            What would you like to begin with today?” 💡
-        </div>
-        """
+        session.pop("test_intent", None)
+        
+        mode = request.args.get("mode", "")
+        
+        welcome_messages = {
+            "career": """
+                <div style='padding:15px;background:#e8f4fd;border-left:5px solid #2196f3;border-radius:10px;'>
+                  <b>💼 Career Guidance Assistant</b><br><br>
+                  Welcome! I'm here to help you explore career opportunities, understand different professions, 
+                  and guide you toward the right career path based on your skills and interests.<br><br>
+                  Ask me about career options, job roles, industry trends, or career advice!
+                </div>
+            """,
+            "mental_health": """
+                <div style='padding:15px;background:#fef5e7;border-left:5px solid #f39c12;border-radius:10px;'>
+                  <b>❤️ Mental Health Support</b><br><br>
+                  I'm here to provide a supportive space for you. Whether you're feeling stressed, anxious, 
+                  or just need someone to talk to, I'm here to listen and offer guidance.<br><br>
+                  Remember: Your mental health matters, and it's okay to ask for help.
+                </div>
+            """,
+            "linkedin": """
+                <div style='padding:15px;background:#e3f2fd;border-left:5px solid #0077b5;border-radius:10px;'>
+                  <b>✍️ LinkedIn Post Generator</b><br><br>
+                  Let's create engaging LinkedIn content! I can help you craft professional posts about your 
+                  achievements, insights, industry trends, or any topic you'd like to share with your network.<br><br>
+                  Tell me what you'd like to write about, and I'll generate a polished LinkedIn post for you!
+                </div>
+            """,
+            "jobs": """
+                <div style='padding:15px;background:#e8f5e9;border-left:5px solid #4caf50;border-radius:10px;'>
+                  <b>💼 Job Recommendations</b><br><br>
+                  I'll analyze your profile and suggest job roles that match your skills and interests. 
+                  Get personalized job recommendations based on your academic performance and strengths.<br><br>
+                  Ask me for job suggestions or tell me about your career interests!
+                </div>
+            """,
+            "mooc": """
+                <div style='padding:15px;background:#fff3e0;border-left:5px solid #ff9800;border-radius:10px;'>
+                  <b>📚 MOOC Course Recommendations</b><br><br>
+                  Looking to upskill? I can help you find the best online courses from platforms like 
+                  Coursera, edX, Udemy, and more, tailored to your interests and career goals.<br><br>
+                  Tell me what skills you want to learn!
+                </div>
+            """,
+            "electives": """
+                <div style='padding:15px;background:#f3e5f5;border-left:5px solid #9c27b0;border-radius:10px;'>
+                  <b>🎓 Elective Recommendations</b><br><br>
+                  Choosing the right electives can shape your career path! I'll help you select subjects 
+                  that align with your interests, strengths, and future goals.<br><br>
+                  Tell me about your semester or interests, and I'll suggest the best electives!
+                </div>
+            """,
+            "market_score": """
+                <div style='padding:15px;background:#fce4ec;border-left:5px solid #e91e63;border-radius:10px;'>
+                  <b>📊 Market Score Analysis</b><br><br>
+                  Understand the market demand for different subjects and skills! I'll provide insights 
+                  into which areas are trending and have strong job prospects.<br><br>
+                  Ask me about market demand for any subject or technology!
+                </div>
+            """
+        }
+        
+        chat_type_names = {
+            "career": "Career Guidance",
+            "mental_health": "Mental Health",
+            "linkedin": "LinkedIn Post Generator",
+            "jobs": "Job Recommendations",
+            "mooc": "MOOC Courses",
+            "electives": "Elective Suggestions",
+            "market_score": "Market Analysis"
+        }
+        
+        welcome_message = welcome_messages.get(mode, """
+            <div style='padding:15px;background:#f1f8ff;border-left:5px solid #007bff;border-radius:10px;'>
+              <b>👋 Welcome to your holistic guidance companion!</b><br><br>
+              This is your personal space for support through every part of your student journey.
+              Whether it's your studies, career, health, or personal growth, I'm here to guide you 
+              toward clarity, confidence, and progress.<br><br>
+              What would you like to begin with today? 💡
+            </div>
+        """)
+        
+        chat_type = chat_type_names.get(mode, "Unified")
+        
         session["chat_history"] = [{"sender": "ai", "text": welcome_message, "html": True}]
-        return render_template("chat.html", user=username, chat_history=session["chat_history"], chat_type="Unified")
+        return render_template("chat.html", user=username, chat_history=session["chat_history"], chat_type=chat_type)
+
 
     # ------------------------ POST (handle message) ------------------------
     chat_history = session.get("chat_history", [])
