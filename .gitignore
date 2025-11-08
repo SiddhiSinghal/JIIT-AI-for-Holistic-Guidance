@@ -1,7 +1,79 @@
-_pycache_/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 *.pyc
+
+# Virtual environments
 venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Flask
+instance/
 instance/*.db
-.env
-user_scores.csv
+.webassets-cache
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data.json
+
+# Uploads
+uploads/*.pdf
+!uploads/.gitkeep
+
+# Cache
 cache/
+chroma_augesc_store/
+.pythonlibs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Compiled code
+*.out
+user_code.cpp
+user_code.out
+
+# PDF files (except samples)
+*.pdf
+
+# Data files
+user_scores.csv
