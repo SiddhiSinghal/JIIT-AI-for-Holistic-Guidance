@@ -1,7 +1,7 @@
 # Flask Web Framework
-flask
-flask-sqlalchemy
-flask-login
+Flask==2.3.3
+Flask-Login==0.6.2
+Flask-SQLAlchemy==3.0.5
 werkzeug
 
 # Streamlit (for elective recommendations)
@@ -14,31 +14,51 @@ scikit-learn
 openpyxl
 
 # AI/ML
-openai
+openai==1.29.0
 google-generativeai
 
 # Visualization
 plotly
 
 # Environment
-python-dotenv
+python-dotenv==1.0.0
 
 # Additional utilities
 requests
 
 # Database
 pymongo
+psycopg2-binary==2.9.9
 
 # PDF Processing
 pymupdf
 
-# Additional dependencies
-Flask==2.3.5
-Flask-Login==0.6.2
-Flask-SQLAlchemy==3.0.5
-python-dotenv==1.0.0
-openai==1.29.0
-psycopg2-binary==2.9.9
+# LangChain
 langchain
 langchain-community
 chromadb
+
+# Security
+markupsafe
+chromadb
+fitz
+flask
+flask-login
+flask-sqlalchemy
+google-generativeai
+langchain
+langchain-community
+markupsafe
+numpy
+openai
+openpyxl
+pandas
+plotly
+psycopg2-binary
+pymongo
+pymupdf
+python-dotenv
+requests
+scikit-learn
+streamlit
+werkzeug
