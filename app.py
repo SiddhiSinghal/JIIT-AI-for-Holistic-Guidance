@@ -283,13 +283,13 @@ def unified_chat():
             }
             for key, url in test_map.items():
                 if key in user_message.lower():
-                    test_url = test_map[selected_test]
+                    test_url = url
                     ai_reply = {
                         "sender": "ai",
                         "html": True,
                         "text": f"""
                         <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
-                        🚀 Ready to begin your <b>{selected_test.capitalize()} Test</b>?<br><br>
+                        🚀 Ready to begin your <b>{key.capitalize()} Test</b>?<br><br>
                         <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
                         <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
                           Start Test
