@@ -108,14 +108,8 @@
   // Auto-scroll chat
   const chatBox = document.getElementById("chatBox");
   chatBox.scrollTop = chatBox.scrollHeight;
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-  // Auto-scroll chat
-  const chatBox = document.getElementById("chatBox");
-  chatBox.scrollTop = chatBox.scrollHeight;
 
-  // ✅ Function to open test link in a new tab instead of a modal
+  // Function to open test link in a new tab instead of a modal
   function openTestIfRequired() {
     const aiMessages = document.querySelectorAll(".ai-msg .msg-bubble");
     for (let el of aiMessages) {
@@ -142,10 +136,6 @@
       }
     }
   }
-</script>
-  // On page load, check if a test needs to be opened
-  window.addEventListener("load", openTestIfRequired);
-</script>
 
   // On page load, check if a test needs to be opened
   window.addEventListener("load", openTestIfRequired);

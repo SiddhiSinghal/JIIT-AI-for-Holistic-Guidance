@@ -319,7 +319,7 @@ def unified_chat():
         chat_history.append({"sender": "ai", "text": str(ai_reply), "html": False})
 
     # 🌿 Mid-conversation encouragement every 5 user messages
-    user_msgs = [m for m in chat_history if m["sender"] == "user"]
+    user_msgs = [m for m in chat_history if isinstance(m, dict) and m.get("sender") == "user"]
     if len(user_msgs) % 5 == 0:
         mid_message = """
         <div style='padding:10px;background:#e8f5e9;border-left:4px solid #43a047;border-radius:8px;'>
