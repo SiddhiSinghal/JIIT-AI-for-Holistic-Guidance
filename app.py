@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from pymongo import MongoClient
+from db_adapter import MockMongoClient as MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
@@ -29,7 +29,7 @@ from utils.skills import SKILL_LABELS
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
 
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient("mock://localhost:27017/")
 db = client["holistic_guidance"]
 users_collection = db["users"]
 
@@ -505,4 +505,4 @@ def coding_test():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
