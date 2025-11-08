@@ -3,143 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Career & Mental Health Chat</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background: #f8f9fa; }
-    .chat-container {
-      max-width: 850px;
-      margin: 40px auto;
-      background: white;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-      height: 85vh;
-      display: flex;
-      flex-direction: column;
-    }
-    .chat-box {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px;
-      margin-bottom: 10px;
-    }
-    .chat-message { margin-bottom: 15px; display: flex; }
-    .user-msg { justify-content: flex-end; }
-    .ai-msg { justify-content: flex-start; }
-    .msg-bubble {
-      max-width: 75%;
-      padding: 12px 16px;
-      border-radius: 20px;
-      font-size: 15px;
-      line-height: 1.5;
-      word-wrap: break-word;
-    }
-    .msg-user {
-      background-color: #007bff;
-      color: white;
-      border-bottom-right-radius: 0;
-    }
-    .msg-ai {
-      background-color: #f1f3f5;
-      border-bottom-left-radius: 0;
-    }
-    .chat-header {
-      text-align: center;
-      font-weight: 600;
-      margin-bottom: 10px;
-      font-size: 20px;
-      color: #343a40;
-    }
-  </style>
+  <title>{{ chat_type }} Chat - JIIT AI Hub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-
-<div class="chat-container">
-  <h4 class="chat-header">{{ chat_type }} Guidance Chat</h4>
-
-  <div class="chat-box" id="chatBox">
-    {% if chat_history %}
-      {% for msg in chat_history %}
-        <div class="chat-message {% if msg.sender == 'user' %}user-msg{% else %}ai-msg{% endif %}">
-          <div class="msg-bubble {% if msg.sender == 'user' %}msg-user{% else %}msg-ai{% endif %}"
-               {% if msg.action %} data-action="{{ msg.action }}" data-test-url="{{ msg.test_url }}" {% endif %}>
-            {% if msg.sender == 'user' %}
-              <strong>You:</strong> {{ msg.text }}
-            {% else %}
-              <strong>AI:</strong><br>
-              {% if msg.html %}
-                {{ msg.text | safe }}
-              {% else %}
-                {{ msg.text }}
-              {% endif %}
-            {% endif %}
-          </div>
+  <header class="header">
+    <div class="header-container">
+      <div class="logo-section">
+        <img src="{{ url_for('static', filename='images/jiit-logo.jpg') }}" alt="JIIT Logo" class="logo-img">
+        <div class="logo-text">
+          <div class="logo-title">JIIT AI Hub</div>
+          <div class="logo-subtitle">Holistic Guidance Platform</div>
         </div>
-      {% endfor %}
-    {% else %}
-      <p class="text-muted text-center">Start your conversation below 👇</p>
-    {% endif %}
-  </div>
-
-  <form method="POST" class="d-flex mt-2">
-    <input type="text" name="prompt" class="form-control me-2" placeholder="Type your message..." required>
-    <button class="btn btn-primary" type="submit">Send</button>
-  </form>
-</div>
-
-<!-- Modal for displaying tests -->
-<div class="modal fade" id="testModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Test</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0">
-        <iframe id="testIframe" src="" style="width:100%;height:75vh;border:0;"></iframe>
+      <nav class="nav-links">
+        <a href="/home" class="nav-link">
+          <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="/profile" class="nav-link">
+          <i class="fas fa-user"></i> Profile
+        </a>
+        <a href="/logout" class="nav-link">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <aside class="side-panel">
+    <h3 class="side-panel-title">
+      <i class="fas fa-compass"></i> Navigate Features
+    </h3>
+    <nav class="panel-nav">
+      <a href="/chat?mode=career" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-brain"></i></span>
+        <span class="panel-label">Career Guidance</span>
+      </a>
+      <a href="/chat?mode=mental_health" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-heart"></i></span>
+        <span class="panel-label">Mental Health</span>
+      </a>
+      <a href="/profile" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-chart-line"></i></span>
+        <span class="panel-label">Skill Profiling</span>
+      </a>
+      <a href="/chat?mode=electives" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-graduation-cap"></i></span>
+        <span class="panel-label">Elective Suggestions</span>
+      </a>
+      <a href="/chat?mode=jobs" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-briefcase"></i></span>
+        <span class="panel-label">Job Recommendations</span>
+      </a>
+      <a href="/chat?mode=mooc" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-book-open"></i></span>
+        <span class="panel-label">MOOC Courses</span>
+      </a>
+      <a href="/chat?mode=market_score" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-chart-bar"></i></span>
+        <span class="panel-label">Market Analysis</span>
+      </a>
+      <a href="/aptitude_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-brain"></i></span>
+        <span class="panel-label">Aptitude Test</span>
+      </a>
+      <a href="/communication_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-comments"></i></span>
+        <span class="panel-label">Communication Test</span>
+      </a>
+      <a href="/creativity_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-lightbulb"></i></span>
+        <span class="panel-label">Creativity Test</span>
+      </a>
+      <a href="/coding_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-code"></i></span>
+        <span class="panel-label">Coding Test</span>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content with-sidebar">
+    <div class="chat-container">
+      <div class="chat-header">
+        <i class="fas fa-comments"></i>
+        <span class="chat-header-title">{{ chat_type }} Guidance Chat</span>
+      </div>
+
+      <div class="chat-messages" id="chatBox">
+        {% if chat_history %}
+          {% for msg in chat_history %}
+            <div class="message {% if msg.sender == 'user' %}user{% else %}bot{% endif %}">
+              <div class="message-avatar">
+                {% if msg.sender == 'user' %}
+                  <i class="fas fa-user"></i>
+                {% else %}
+                  <i class="fas fa-robot"></i>
+                {% endif %}
+              </div>
+              <div class="message-content"
+                   {% if msg.action %} data-action="{{ msg.action }}" data-test-url="{{ msg.test_url }}" {% endif %}>
+                {% if msg.html %}
+                  {{ msg.text | safe }}
+                {% else %}
+                  {{ msg.text }}
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="message bot">
+            <div class="message-avatar">
+              <i class="fas fa-robot"></i>
+            </div>
+            <div class="message-content">
+              <strong>👋 Hello!</strong><br><br>
+              I'm your AI assistant for <strong>{{ chat_type }}</strong> guidance. 
+              Feel free to ask me anything - I'm here to help you succeed!
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="chat-input-area">
+        <form method="POST" class="chat-input-form">
+          <input 
+            type="text" 
+            name="prompt" 
+            class="chat-input" 
+            placeholder="Type your message here..." 
+            required
+            autocomplete="off"
+          >
+          <button type="submit" class="chat-send-btn">
+            <i class="fas fa-paper-plane"></i>
+            Send
+          </button>
+        </form>
       </div>
     </div>
-  </div>
-</div>
+  </main>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-  // Auto-scroll chat
-  const chatBox = document.getElementById("chatBox");
-  chatBox.scrollTop = chatBox.scrollHeight;
+  <script>
+    const chatBox = document.getElementById("chatBox");
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-  // Function to open test link in a new tab instead of a modal
-  function openTestIfRequired() {
-    const aiMessages = document.querySelectorAll(".ai-msg .msg-bubble");
-    for (let el of aiMessages) {
-      const action = el.getAttribute("data-action");
-      const testUrl = el.getAttribute("data-test-url");
-      if (action === "start_test" && testUrl) {
-        // Open the test in a new browser tab
-        window.open(testUrl, "_blank", "noopener,noreferrer");
+    const currentParams = new URLSearchParams(window.location.search);
+    const mode = currentParams.get('mode');
+    
+    document.querySelectorAll('.panel-nav-item').forEach(item => {
+      const href = item.getAttribute('href');
+      if (href && mode && href.includes(`mode=${mode}`)) {
+        item.classList.add('active');
+      }
+    });
 
-        // Remove data attributes so it doesn't repeat
-        el.removeAttribute("data-action");
-        el.removeAttribute("data-test-url");
+    function openTestIfRequired() {
+      const aiMessages = document.querySelectorAll(".bot .message-content");
+      for (let el of aiMessages) {
+        const action = el.getAttribute("data-action");
+        const testUrl = el.getAttribute("data-test-url");
+        if (action === "start_test" && testUrl) {
+          window.open(testUrl, "_blank", "noopener,noreferrer");
 
-        // Optionally, append a small confirmation message
-        const confirmMsg = document.createElement("div");
-        confirmMsg.className = "chat-message ai-msg";
-        confirmMsg.innerHTML = `
-          <div class="msg-bubble msg-ai">
-            <strong>AI:</strong> 🚀 Your test has been opened in a new tab. Complete it and come back here once done!
-          </div>`;
-        chatBox.appendChild(confirmMsg);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        break;
+          el.removeAttribute("data-action");
+          el.removeAttribute("data-test-url");
+
+          const confirmMsg = document.createElement("div");
+          confirmMsg.className = "message bot";
+          confirmMsg.innerHTML = `
+            <div class="message-avatar">
+              <i class="fas fa-robot"></i>
+            </div>
+            <div class="message-content">
+              <strong>🚀 Your test has been opened in a new tab.</strong><br>
+              Complete it and come back here once done!
+            </div>`;
+          chatBox.appendChild(confirmMsg);
+          chatBox.scrollTop = chatBox.scrollHeight;
+          break;
+        }
       }
     }
-  }
 
-  // On page load, check if a test needs to be opened
-  window.addEventListener("load", openTestIfRequired);
-</script>
+    window.addEventListener("load", openTestIfRequired);
 
+    document.querySelector('.chat-input-form').addEventListener('submit', function() {
+      const btn = this.querySelector('.chat-send-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading-spinner"></span> Sending...';
+    });
+  </script>
 </body>
 </html>

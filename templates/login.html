@@ -1,20 +1,69 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-  <div class="card p-4 shadow-lg" style="width: 22rem;">
-    <h3 class="text-center mb-3 text-dark fw-bold">Login</h3>
-    <form method="POST">
-      <div class="form-group mb-3">
-        <input type="text" class="form-control" name="username" placeholder="Username" required>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - JIIT AI Hub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <img src="{{ url_for('static', filename='images/jiit-logo.jpg') }}" alt="JIIT Logo">
+        <h1 class="auth-title">Welcome Back</h1>
+        <p style="color: var(--jiit-gray); text-align: center; margin-bottom: 2rem;">
+          Sign in to access your JIIT AI Hub dashboard
+        </p>
       </div>
-      <div class="form-group mb-3">
-        <input type="password" class="form-control" name="password" placeholder="Password" required>
+
+      {% if error %}
+      <div class="alert alert-error">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>{{ error }}</span>
       </div>
-      <button type="submit" class="btn btn-dark w-100">Login</button>
-    </form>
-    <p class="mt-3 text-center">Don't have an account? 
-      <a href="{{ url_for('signup') }}" class="text-decoration-none">Sign up</a>
-    </p>
+      {% endif %}
+
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">
+            <i class="fas fa-user"></i> Username
+          </label>
+          <input 
+            type="text" 
+            class="form-input" 
+            name="username" 
+            placeholder="Enter your username" 
+            required
+            autocomplete="username"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <i class="fas fa-lock"></i> Password
+          </label>
+          <input 
+            type="password" 
+            class="form-input" 
+            name="password" 
+            placeholder="Enter your password" 
+            required
+            autocomplete="current-password"
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-sign-in-alt"></i> Login
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        Don't have an account? 
+        <a href="{{ url_for('signup') }}">Sign up</a>
+      </div>
+    </div>
   </div>
-</div>
-{% endblock %}
+</body>
+</html>
