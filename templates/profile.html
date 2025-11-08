@@ -57,5 +57,41 @@
         </div>
     </div>
 </div>
+<!-- ================== TEST RESULTS SECTION ================== -->
+<div class="container mt-5">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">🧩 Your Test Results</h5>
+      </div>
+      <div class="card-body">
+        {% if assessments and assessments|length > 0 %}
+          <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">Test Type</th>
+                  <th scope="col">Score</th>
+                  <th scope="col">Date Taken</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in assessments %}
+                <tr>
+                  <td><strong>{{ a.type }}</strong></td>
+                  <td>{{ a.score }}</td>
+                  <td>{{ a.date }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted text-center mb-0">No assessments taken yet. Take a test from the chat to get started 🎯</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <!-- =========================================================== -->
+  
 </body>
 </html>

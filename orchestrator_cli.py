@@ -42,6 +42,19 @@ def classify_prompt(prompt: str) -> str:
         "career prediction", "which job", "job role",
         "my top job", "find job", "career path"
     ]
+
+    if any(k in prompt for k in ["take test", "start test", "i want to take", "give me the test", "start the", "take the"]):
+        if "aptitude" in prompt:
+            return "test:aptitude"
+        if "communication" in prompt or "communicat" in prompt:
+            return "test:communication"
+        if "coding" in prompt or "code" in prompt or "programming" in prompt:
+            return "test:coding"
+        if "creativity" in prompt or "creative" in prompt or "story" in prompt:
+            return "test:creativity"
+        # fallback: let user choose
+        return "test:choose"
+
     if any(k in prompt for k in job_keywords):
         print("🎯 Detected JOB intent")
         return "job"
@@ -175,24 +188,71 @@ def run_non_llm_agent(agent_key: str, username=None, last_user_message=None):
 # MAIN ORCHESTRATOR
 # --------------------------------------------------
 def orchestrate(prompt: str, username=None, last_user_message=None):
-
     """Main orchestrator logic for CLI or Flask route."""
+    prompt_lower = prompt.lower().strip()
     print("\n🧠 Classifying task type...")
+
+    # ✅ 1. Detect test request ONLY if this prompt actually asks for a test
+    if re.search(r"\b(take|start|begin|give|attempt|want).*\btest\b", prompt_lower):
+        print("🎯 Detected explicit test request")
+        return handle_test_request(prompt_lower)
+
+    # ✅ 2. Normal flow (fresh classification each time)
     task_type = classify_prompt(prompt)
 
     if task_type == "unknown":
         return "⚠️ Sorry, I couldn’t determine what you’re asking about."
 
+    # ✅ 3. Route normally to agents
     if task_type in LLM_AGENTS:
         print(f"🧩 Using LLM-based agent: {task_type}")
         result = run_llm_agent(task_type, prompt)
     elif task_type in NON_LLM_AGENTS:
         result = run_non_llm_agent(task_type, username, last_user_message)
-
     else:
         result = "❌ No suitable agent found."
 
     return result
+
+
+
+def handle_test_request(prompt: str):
+    """Respond with the appropriate test link based on user request."""
+    prompt = prompt.lower().strip()
+
+    # 🔍 Normalize to one word
+    test_name = None
+    route = None
+
+    if "aptitude" in prompt:
+        test_name, route = "Aptitude Test", "/aptitude_test"
+    elif "communication" in prompt or "comm" in prompt:
+        test_name, route = "Communication Test", "/communication_test"
+    elif "creativity" in prompt or "creative" in prompt:
+        test_name, route = "Creativity Test", "/creativity_test"
+    elif "coding" in prompt or "programming" in prompt or "problem" in prompt:
+        test_name, route = "Coding Test", "/coding_test"
+
+    if not test_name:
+        return Markup("""
+        <div style='padding:10px;background:#fff3cd;border-left:5px solid #ffcc00;border-radius:8px;'>
+          ⚠️ Please specify which test you'd like to take: 
+          <b>Aptitude</b>, <b>Communication</b>, <b>Creativity</b>, or <b>Coding</b>.
+        </div>
+        """)
+
+    # 🧠 Respond with a styled button
+    return Markup(f"""
+    <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
+      Ready to begin your <b>{test_name}</b>?<br><br>
+      <a href='{route}' target='_blank'>
+        <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
+          🚀 Start {test_name}
+        </button>
+      </a>
+    </div>
+    """)
+
 
 
 # --------------------------------------------------

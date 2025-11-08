@@ -24,16 +24,9 @@
       padding: 10px;
       margin-bottom: 10px;
     }
-    .chat-message {
-      margin-bottom: 15px;
-      display: flex;
-    }
-    .user-msg {
-      justify-content: flex-end;
-    }
-    .ai-msg {
-      justify-content: flex-start;
-    }
+    .chat-message { margin-bottom: 15px; display: flex; }
+    .user-msg { justify-content: flex-end; }
+    .ai-msg { justify-content: flex-start; }
     .msg-bubble {
       max-width: 75%;
       padding: 12px 16px;
@@ -69,7 +62,8 @@
     {% if chat_history %}
       {% for msg in chat_history %}
         <div class="chat-message {% if msg.sender == 'user' %}user-msg{% else %}ai-msg{% endif %}">
-          <div class="msg-bubble {% if msg.sender == 'user' %}msg-user{% else %}msg-ai{% endif %}">
+          <div class="msg-bubble {% if msg.sender == 'user' %}msg-user{% else %}msg-ai{% endif %}"
+               {% if msg.action %} data-action="{{ msg.action }}" data-test-url="{{ msg.test_url }}" {% endif %}>
             {% if msg.sender == 'user' %}
               <strong>You:</strong> {{ msg.text }}
             {% else %}
@@ -94,10 +88,67 @@
   </form>
 </div>
 
+<!-- Modal for displaying tests -->
+<div class="modal fade" id="testModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Test</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <iframe id="testIframe" src="" style="width:100%;height:75vh;border:0;"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // Auto-scroll to bottom
+  // Auto-scroll chat
   const chatBox = document.getElementById("chatBox");
   chatBox.scrollTop = chatBox.scrollHeight;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Auto-scroll chat
+  const chatBox = document.getElementById("chatBox");
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // ✅ Function to open test link in a new tab instead of a modal
+  function openTestIfRequired() {
+    const aiMessages = document.querySelectorAll(".ai-msg .msg-bubble");
+    for (let el of aiMessages) {
+      const action = el.getAttribute("data-action");
+      const testUrl = el.getAttribute("data-test-url");
+      if (action === "start_test" && testUrl) {
+        // Open the test in a new browser tab
+        window.open(testUrl, "_blank", "noopener,noreferrer");
+
+        // Remove data attributes so it doesn't repeat
+        el.removeAttribute("data-action");
+        el.removeAttribute("data-test-url");
+
+        // Optionally, append a small confirmation message
+        const confirmMsg = document.createElement("div");
+        confirmMsg.className = "chat-message ai-msg";
+        confirmMsg.innerHTML = `
+          <div class="msg-bubble msg-ai">
+            <strong>AI:</strong> 🚀 Your test has been opened in a new tab. Complete it and come back here once done!
+          </div>`;
+        chatBox.appendChild(confirmMsg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        break;
+      }
+    }
+  }
+</script>
+  // On page load, check if a test needs to be opened
+  window.addEventListener("load", openTestIfRequired);
+</script>
+
+  // On page load, check if a test needs to be opened
+  window.addEventListener("load", openTestIfRequired);
 </script>
 
 </body>
