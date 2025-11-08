@@ -1,6 +1,109 @@
-<form method="POST" class="p-4">
-    <h4>{{ prompt }}</h4>
-    <textarea name="story" class="form-control" rows="8" required></textarea>
-    <button class="btn btn-primary mt-3" type="submit">Submit Story</button>
-  </form>
-  
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creativity Test - JIIT AI Hub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-container">
+      <div class="logo-section">
+        <img src="{{ url_for('static', filename='images/jiit-logo.png') }}" alt="JIIT Logo" class="logo-img">
+        <div class="logo-text">
+          <div class="logo-title">JIIT AI Hub</div>
+          <div class="logo-subtitle">Holistic Guidance Platform</div>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="/home" class="nav-link">
+          <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="/chat" class="nav-link">
+          <i class="fas fa-comments"></i> Chat
+        </a>
+        <a href="/logout" class="nav-link">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <aside class="side-panel">
+    <h3 class="side-panel-title">
+      <i class="fas fa-compass"></i> Navigate Features
+    </h3>
+    <nav class="panel-nav">
+      <a href="/chat" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-comments"></i></span>
+        <span class="panel-label">Unified Chat</span>
+      </a>
+      <a href="/chat?mode=career" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-brain"></i></span>
+        <span class="panel-label">Career Guidance</span>
+      </a>
+      <a href="/chat?mode=mental_health" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-heart"></i></span>
+        <span class="panel-label">Mental Health</span>
+      </a>
+      <a href="/chat?mode=linkedin" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-linkedin"></i></span>
+        <span class="panel-label">LinkedIn Post Generator</span>
+      </a>
+      <a href="/profile" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-chart-line"></i></span>
+        <span class="panel-label">Skill Profiling</span>
+      </a>
+      <a href="/aptitude_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-brain"></i></span>
+        <span class="panel-label">Aptitude Test</span>
+      </a>
+      <a href="/communication_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-comments"></i></span>
+        <span class="panel-label">Communication Test</span>
+      </a>
+      <a href="/creativity_test" class="panel-nav-item active">
+        <span class="panel-icon"><i class="fas fa-lightbulb"></i></span>
+        <span class="panel-label">Creativity Test</span>
+      </a>
+      <a href="/coding_test" class="panel-nav-item">
+        <span class="panel-icon"><i class="fas fa-code"></i></span>
+        <span class="panel-label">Coding Test</span>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content with-sidebar">
+    <div class="container" style="max-width: 900px; padding: 2rem;">
+      <div class="card" style="border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); padding: 2rem;">
+        <h2 style="color: var(--jiit-dark); margin-bottom: 1.5rem;">
+          <i class="fas fa-lightbulb"></i> Creativity Test
+        </h2>
+        <p style="color: var(--jiit-gray); margin-bottom: 2rem;">
+          Let your imagination flow! Your score will be based on vocabulary diversity and story structure.
+        </p>
+        
+        <form method="POST">
+          <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <label style="font-weight: 600; color: var(--jiit-dark); margin-bottom: 1rem; display: block;">
+              {{ prompt }}
+            </label>
+            <textarea 
+              name="story" 
+              rows="12" 
+              required
+              placeholder="Write a creative and engaging story based on the prompt above..."
+              style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; font-family: inherit;"
+            ></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1.1rem;">
+            <i class="fas fa-check-circle"></i> Submit Story
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
