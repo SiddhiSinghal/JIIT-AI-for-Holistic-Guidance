@@ -6,7 +6,7 @@ import os
 import fitz  # PyMuPDF
 import re
 import orchestrator_cli
-from summer_project.rag_chain import get_mental_health_response
+from summer_project.rag_chain import get_health_guidance_response
 from markupsafe import Markup
 import json
 import random
@@ -249,12 +249,12 @@ def unified_chat():
                   Ask me about career options, job roles, industry trends, or career advice!
                 </div>
             """,
-            "mental_health": """
+            "health_guidance": """
                 <div style='padding:15px;background:#fef5e7;border-left:5px solid #f39c12;border-radius:10px;'>
-                  <b>❤️ Mental Health Support</b><br><br>
+                  <b>❤️ Health Guidance Support</b><br><br>
                   I'm here to provide a supportive space for you. Whether you're feeling stressed, anxious, 
                   or just need someone to talk to, I'm here to listen and offer guidance.<br><br>
-                  Remember: Your mental health matters, and it's okay to ask for help.
+                  Remember: Your health and wellbeing matter, and it's okay to ask for help.
                 </div>
             """,
             "linkedin": """
@@ -301,7 +301,7 @@ def unified_chat():
         
         chat_type_names = {
             "career": "Career Guidance",
-            "mental_health": "Mental Health",
+            "health_guidance": "Health Guidance",
             "linkedin": "LinkedIn Post Generator",
             "jobs": "Job Recommendations",
             "mooc": "MOOC Courses",
@@ -340,9 +340,9 @@ def unified_chat():
         ):
             ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
 
-        # 🔹 Detect emotional content (mental health)
+        # 🔹 Detect emotional content (health guidance)
         elif any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure"]):
-            ai_reply = get_mental_health_response(user_message)
+            ai_reply = get_health_guidance_response(user_message)
 
         # 🔹 Detect test-related intent (with regex, so it’s not over-sensitive)
         elif re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower()):
