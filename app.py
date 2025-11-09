@@ -6,7 +6,7 @@ import os
 import fitz  # PyMuPDF
 import re
 import orchestrator_cli
-from summer_project.rag_chain import get_health_guidance_response
+from summer_project.rag_chain import get_mental_health_response
 from markupsafe import Markup
 import json
 import random
@@ -347,7 +347,7 @@ def unified_chat():
 
         # 🔹 Detect emotional content (health guidance)
         elif any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure", "done"]):
-            ai_reply = get_health_guidance_response(user_message)
+            ai_reply = get_mental_health_response(user_message)
 
         # 🔹 Detect test-related intent (with regex, so it’s not over-sensitive)
         elif re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower()):
