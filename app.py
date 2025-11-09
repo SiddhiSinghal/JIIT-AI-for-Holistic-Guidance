@@ -225,8 +225,11 @@ def profile():
     return render_template("profile.html", user_data=user_data, assessments=assessments, user=username)
 
 
-# ==================== UNIFIED CHAT (CAREER + MENTAL + TESTS) ====================
+# ==================== UNIFIED CHAT (CAREER + MENTAL + ROADMAP + TESTS) ====================
 from markupsafe import Markup
+import re
+from agents.roadmap import generate_custom_roadmap  # ✅ import roadmap generator
+
 @app.route("/chat", methods=["GET", "POST"])
 def unified_chat():
     if "user" not in session:
@@ -238,9 +241,9 @@ def unified_chat():
     if request.method == "GET":
         session["chat_history"] = []
         session.pop("test_intent", None)
-        
+
         mode = request.args.get("mode", "")
-        
+
         welcome_messages = {
             "career": """
                 <div style='padding:15px;background:#e8f4fd;border-left:5px solid #2196f3;border-radius:10px;'>
@@ -262,177 +265,140 @@ def unified_chat():
                 <div style='padding:15px;background:#e3f2fd;border-left:5px solid #0077b5;border-radius:10px;'>
                   <b>✍️ LinkedIn Post Generator</b><br><br>
                   Let's create engaging LinkedIn content! I can help you craft professional posts about your 
-                  achievements, insights, industry trends, or any topic you'd like to share with your network.<br><br>
+                  achievements, insights, or any topic you'd like to share with your network.<br><br>
                   Tell me what you'd like to write about, and I'll generate a polished LinkedIn post for you!
                 </div>
             """,
             "jobs": """
                 <div style='padding:15px;background:#e8f5e9;border-left:5px solid #4caf50;border-radius:10px;'>
                   <b>💼 Job Recommendations</b><br><br>
-                  I'll analyze your profile and suggest job roles that match your skills and interests. 
-                  Get personalized job recommendations based on your academic performance and strengths.<br><br>
+                  I'll analyze your profile and suggest job roles that match your skills and interests.<br><br>
                   Ask me for job suggestions or tell me about your career interests!
                 </div>
             """,
-            "mooc": """
-                <div style='padding:15px;background:#fff3e0;border-left:5px solid #ff9800;border-radius:10px;'>
-                  <b>📚 MOOC Course Recommendations</b><br><br>
-                  Looking to upskill? I can help you find the best online courses from platforms like 
-                  Coursera, edX, Udemy, and more, tailored to your interests and career goals.<br><br>
-                  Tell me what skills you want to learn!
-                </div>
-            """,
-            "electives": """
-                <div style='padding:15px;background:#f3e5f5;border-left:5px solid #9c27b0;border-radius:10px;'>
-                  <b>🎓 Elective Recommendations</b><br><br>
-                  Choosing the right electives can shape your career path! I'll help you select subjects 
-                  that align with your interests, strengths, and future goals.<br><br>
-                  Tell me about your semester or interests, and I'll suggest the best electives!
-                </div>
-            """,
-            "market_score": """
-                <div style='padding:15px;background:#fce4ec;border-left:5px solid #e91e63;border-radius:10px;'>
-                  <b>📊 Market Score Analysis</b><br><br>
-                  Understand the market demand for different subjects and skills! I'll provide insights 
-                  into which areas are trending and have strong job prospects.<br><br>
-                  Ask me about market demand for any subject or technology!
-                </div>
-            """
         }
-        
-        chat_type_names = {
-            "career": "Career Guidance",
-            "health_guidance": "Health Guidance",
-            "linkedin": "LinkedIn Post Generator",
-            "jobs": "Job Recommendations",
-            "mooc": "MOOC Courses",
-            "electives": "Elective Suggestions",
-            "market_score": "Market Analysis"
-        }
-        
+
         welcome_message = welcome_messages.get(mode, """
             <div style='padding:15px;background:#f1f8ff;border-left:5px solid #007bff;border-radius:10px;'>
-              <b>👋 Welcome to your holistic guidance companion!</b><br><br>
+              <b>👋 Hi there! Welcome to your holistic guidance companion.</b><br><br>
               This is your personal space for support through every part of your student journey.
-              Whether it's your studies, career, health, or personal growth, I'm here to guide you 
+              Whether it’s your studies, career, health, or personal growth — I’m here to guide you 
               toward clarity, confidence, and progress.<br><br>
               What would you like to begin with today? 💡
             </div>
         """)
-        
-        chat_type = chat_type_names.get(mode, "Unified")
-        
+
         session["chat_history"] = [{"sender": "ai", "text": welcome_message, "html": True}]
-        return render_template("chat.html", user=username, chat_history=session["chat_history"], chat_type=chat_type)
+        return render_template("chat.html", user=username, chat_history=session["chat_history"], chat_type="Unified")
 
-
-    # ------------------------ POST (handle message) ------------------------
+    # ------------------------ POST (handle messages) ------------------------
     chat_history = session.get("chat_history", [])
     user_message = request.form["prompt"].strip()
     chat_history.append({"sender": "user", "text": user_message})
-
     ai_reply = None
-    if len(chat_history) > 1 and isinstance(chat_history[-2], dict) and chat_history[-2].get("sender") == "ai":
-        last_ai_text = chat_history[-2].get("text", "").lower()
-    else:
-        last_ai_text = ""
 
+    # 🔹 Smart Roadmap Flow ---------------------------------------------------
+    if "roadmap" in user_message.lower():
+        # Extract job role and days if mentioned
+        match_days = re.search(r'(\d+)\s*(?:day|days|week|weeks)', user_message.lower())
+        match_role = re.search(r'roadmap.*for\s+([a-zA-Z\s]+)', user_message.lower())
 
-    try:
-        # ✅ Prevent repeating the same test or action
-        if "opening your" in last_ai_text and not any(
-            word in user_message.lower() for word in ["aptitude", "communication", "creativity", "coding"]
-        ):
-            ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
+        job_role = match_role.group(1).strip().title() if match_role else "Your Goal"
+        days = int(match_days.group(1)) if match_days else None
 
-        # 🔹 Detect emotional content (health guidance)
-        elif any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure", "done"]):
-            ai_reply = get_mental_health_response(user_message)
-
-        # 🔹 Detect test-related intent (with regex, so it’s not over-sensitive)
-        elif re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower()):
-            test_map = {
-                "aptitude": "/aptitude_test",
-                "communication": "/communication_test",
-                "creativity": "/creativity_test",
-                "coding": "/coding_test"
-            }
-            selected_test = None
-            for key in test_map.keys():
-                if key in user_message.lower():
-                    selected_test = key
-                    break
-
-            if not selected_test:
-                ai_reply = {
-                    "sender": "ai",
-                    "text": """
-                    Which test would you like to take? 💡<br>
-                    You can choose one of the following:<br>
-                    👉 Aptitude<br>
-                    👉 Communication<br>
-                    👉 Creativity<br>
-                    👉 Coding
-                    """,
-                    "html": True
-                }
-                session["test_intent"] = True
-            else:
-                test_url = test_map[selected_test]
-                ai_reply = {
-                    "sender": "ai",
-                    "html": True,
-                    "text": f"""
-                    <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
-                      🚀 Ready to begin your <b>{selected_test.capitalize()} Test</b>?<br><br>
-                      <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
-                        <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
-                          Start Test
-                        </button>
-                      </a>
-                    </div>
-                    """
-                }
-                session["test_intent"] = False
-
-        # 🔹 If user had previously said “start test” but now gives the type name only
-        elif session.get("test_intent") and any(k in user_message.lower() for k in ["aptitude", "communication", "creativity", "coding"]):
-            test_map = {
-                "aptitude": "/aptitude_test",
-                "communication": "/communication_test",
-                "creativity": "/creativity_test",
-                "coding": "/coding_test"
-            }
-            for key, url in test_map.items():
-                if key in user_message.lower():
-                    test_url = url
-                    ai_reply = {
-                        "sender": "ai",
-                        "html": True,
-                        "text": f"""
-                        <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
-                        🚀 Ready to begin your <b>{key.capitalize()} Test</b>?<br><br>
-                        <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
-                        <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
-                          Start Test
-                        </button>
-                        </a>
-                        </div>
-                        """
-                    }
-
-                    session["test_intent"] = False
-                    break
-
-        # 🔹 Otherwise, handle normally via orchestrator
+        if days:
+            session["roadmap_days"] = days
+            session["roadmap_role"] = job_role
+            session["awaiting_topics"] = True
+            ai_text = f"Got it! You want a {days}-day roadmap for <b>{job_role}</b>. 🧠<br>Now tell me — what topics or syllabus areas should I focus on?"
         else:
-            ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
+            session["awaiting_roadmap_days"] = True
+            session["roadmap_role"] = job_role
+            ai_text = f"Sure! 📘 Let's plan your roadmap for <b>{job_role}</b>.<br>How many days do you want to complete it in?"
+
+        chat_history.append({"sender": "ai", "text": ai_text, "html": True})
+        session["chat_history"] = chat_history[-12:]
+        return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
+
+    # Step 2️⃣: User provides number of days
+    if session.get("awaiting_roadmap_days"):
+        try:
+            days = int(re.search(r'\d+', user_message).group())
+            session["roadmap_days"] = days
+            session.pop("awaiting_roadmap_days", None)
+            session["awaiting_topics"] = True
+            ai_text = f"Perfect! We'll build a roadmap for <b>{session.get('roadmap_role','your goal')}</b> in {days} days. ✨<br>Now please share your main topics or syllabus."
+        except:
+            ai_text = "⚠️ Please enter a valid number of days (like 30 or 45)."
+        chat_history.append({"sender": "ai", "text": ai_text, "html": True})
+        session["chat_history"] = chat_history[-12:]
+        return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
+
+    # Step 3️⃣: User provides topics
+    if session.get("awaiting_topics"):
+        topics = [t.strip() for t in user_message.split(",")]
+        days = session.get("roadmap_days", 30)
+        job_role = session.get("roadmap_role", "Your Goal")
+        session.pop("awaiting_topics", None)
+
+        html_response = generate_custom_roadmap(job_role, topics, days)
+        chat_history.append({"sender": "ai", "text": html_response, "html": True})
+        session["chat_history"] = chat_history[-12:]
+        return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
+
+    # 🔹 Mental Health Detection ----------------------------------------------
+    if any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure", "done"]):
+        from summer_project.rag_chain import get_mental_health_response
+        ai_reply = get_mental_health_response(user_message)
+
+    # 🔹 Test Detection --------------------------------------------------------
+    elif re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower()):
+        test_map = {
+            "aptitude": "/aptitude_test",
+            "communication": "/communication_test",
+            "creativity": "/creativity_test",
+            "coding": "/coding_test"
+        }
+        selected_test = None
+        for key in test_map.keys():
+            if key in user_message.lower():
+                selected_test = key
+                break
+
+        if not selected_test:
+            ai_reply = {
+                "sender": "ai",
+                "text": """
+                Which test would you like to take? 💡<br>
+                👉 Aptitude<br>👉 Communication<br>👉 Creativity<br>👉 Coding
+                """,
+                "html": True
+            }
+            session["test_intent"] = True
+        else:
+            test_url = test_map[selected_test]
+            ai_reply = {
+                "sender": "ai",
+                "html": True,
+                "text": f"""
+                <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
+                  🚀 Ready to begin your <b>{selected_test.capitalize()} Test</b>?<br><br>
+                  <a href='{test_url}' target='_blank'>
+                    <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
+                      Start Test
+                    </button>
+                  </a>
+                </div>
+                """
+            }
             session["test_intent"] = False
 
-    except Exception as e:
-        ai_reply = f"Sorry, there was an error: {e}"
+    # 🔹 Otherwise, fallback to orchestrator (career, linkedin, etc.)
+    else:
+        ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
+        session["test_intent"] = False
 
-    # ------------------------ Append AI reply ------------------------
+    # Append AI reply ---------------------------------------------------------
     if isinstance(ai_reply, dict):
         chat_history.append(ai_reply)
     elif isinstance(ai_reply, Markup):
@@ -440,22 +406,20 @@ def unified_chat():
     else:
         chat_history.append({"sender": "ai", "text": str(ai_reply), "html": False})
 
-    # 🌿 Mid-conversation encouragement every 5 user messages
-    user_msgs = [m for m in chat_history if isinstance(m, dict) and m.get("sender") == "user"]
+    # 🌿 Friendly mid-conversation message every 5 user inputs
+    user_msgs = [m for m in chat_history if m.get("sender") == "user"]
     if len(user_msgs) % 5 == 0:
         mid_message = """
         <div style='padding:10px;background:#e8f5e9;border-left:4px solid #43a047;border-radius:8px;'>
           You're doing great! 🌱<br>
-          Would you like to continue chatting or explore a test or career advice?
+          Would you like to continue here, or explore another area — Studies, Career, Health, or Personal Growth?
         </div>
         """
         chat_history.append({"sender": "ai", "text": mid_message, "html": True})
 
-    # ✅ Always reset state before returning
     session["chat_history"] = chat_history[-12:]
-    session.pop("selected_questions", None)
-    session.pop("question", None)
-    return render_template("chat.html", user=username, chat_history=session["chat_history"], chat_type="Unified")
+    return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
+
 
 # ==================== TEST ROUTES ====================
 
