@@ -60,7 +60,7 @@ def classify_prompt(prompt: str) -> str:
         return "job"
 
     # 🔹 Career exploration
-    if any(k in prompt for k in ["career", "profession", "scope", "salary"]):
+    if any(k in prompt for k in ["career", "profession", "scope", "salary","about","about career"]):
         return "career"
 
     # 🔹 Roadmap
@@ -98,27 +98,45 @@ def classify_prompt(prompt: str) -> str:
     print("⚠️ Unknown task type detected")
     return "unknown"
 
-
-# --------------------------------------------------
-# RUN LLM AGENTS
-# --------------------------------------------------
 def run_llm_agent(agent_key: str, prompt: str):
-    """Run LLM-based agent depending on key."""
+    """Run LLM-based agent depending on key, and return formatted HTML."""
     mod = importlib.import_module(LLM_AGENTS.get(agent_key))
-    if agent_key == "career":
-        return mod.get_career_info(prompt)
-    elif agent_key == "roadmap":
-        return mod.get_roadmap(prompt, {"DSA": 8, "Math": 7}, weeks=10)
-    elif agent_key == "linkedin":
-        return mod.generate_linkedin_post("AI", ["LLMs are transforming industry", "Focus on practical application"])
-    elif agent_key == "research":
-        return mod.run_research(prompt)
-    elif agent_key == "factcheck":
-        return mod.fact_check(prompt)
-    elif agent_key == "mooc":
-        pdf_path = os.path.join(os.path.dirname(mod.__file__), "uu.pdf")
-        return mod.run_pdf_mooc_query(prompt, pdf_path)
-    return f"⚠️ No valid LLM agent found for '{agent_key}'."
+
+    try:
+        if agent_key == "career":
+            # ✅ Returns formatted career card
+            html = mod.get_career_info(prompt)
+            return Markup(html)
+
+        elif agent_key == "roadmap":
+            # ✅ Returns roadmap (already Markup formatted)
+            html = mod.get_roadmap(prompt, {"DSA": 8, "Math": 7}, weeks=10)
+            return Markup(html)
+
+        elif agent_key == "linkedin":
+            # 🧠 Text output, keep plain
+            return mod.generate_linkedin_post(
+                "AI",
+                ["LLMs are transforming industry", "Focus on practical application"]
+            )
+
+        elif agent_key == "research":
+            return mod.run_research(prompt)
+
+        elif agent_key == "factcheck":
+            return mod.fact_check(prompt)
+
+        elif agent_key == "mooc":
+            pdf_path = os.path.join(os.path.dirname(mod.__file__), "uu.pdf")
+            return mod.run_pdf_mooc_query(prompt, pdf_path)
+
+        else:
+            return Markup(f"<p>⚠️ No valid LLM agent found for '<b>{agent_key}</b>'.</p>")
+
+    except Exception as e:
+        print(f"❌ Error in agent '{agent_key}':", e)
+        return Markup(f"<p>⚠️ Error while running <b>{agent_key}</b> agent: {e}</p>")
+
 
 
 # --------------------------------------------------

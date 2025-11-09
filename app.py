@@ -332,7 +332,11 @@ def unified_chat():
     chat_history.append({"sender": "user", "text": user_message})
 
     ai_reply = None
-    last_ai_text = chat_history[-2]["text"].lower() if len(chat_history) > 1 and chat_history[-2]["sender"] == "ai" else ""
+    if len(chat_history) > 1 and isinstance(chat_history[-2], dict) and chat_history[-2].get("sender") == "ai":
+        last_ai_text = chat_history[-2].get("text", "").lower()
+    else:
+        last_ai_text = ""
+
 
     try:
         # ✅ Prevent repeating the same test or action
@@ -342,7 +346,7 @@ def unified_chat():
             ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
 
         # 🔹 Detect emotional content (mental health)
-        elif any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure"]):
+        elif any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure","done"]):
             ai_reply = get_mental_health_response(user_message)
 
         # 🔹 Detect test-related intent (with regex, so it’s not over-sensitive)
