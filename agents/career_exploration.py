@@ -2,10 +2,10 @@
 import json
 from markupsafe import Markup
 
-# ✅ Modern Ollama import (no API key needed)
+# ✅ Local LLaMA 3 (no key needed)
 from langchain_ollama import OllamaLLM
 
-# Initialize LLaMA 3 model safely
+# Try initializing LLaMA 3 locally
 try:
     llm = OllamaLLM(model="llama3")
 except Exception as e:
@@ -15,8 +15,8 @@ except Exception as e:
 
 def get_career_info(career_name: str):
     """
-    Returns formatted HTML about a career — similar visual format as roadmap.py
-    Uses LLaMA 3 via Ollama (offline, no key required).
+    Generate a styled HTML career overview for a given role.
+    Matches roadmap.py styling — clean, modern, and consistent.
     """
     career_name = career_name.strip().title()
     if not career_name:
@@ -24,81 +24,77 @@ def get_career_info(career_name: str):
 
     data = None
 
-    # 1️⃣ Try generating structured JSON using LLaMA 3
+    # 1️⃣ Try using LLaMA 3 to get structured JSON
     if llm:
         prompt = f"""
-        You are a career counseling expert.
-        Provide accurate and professional information about the role '{career_name}'.
+        You are a professional career counselor.
+        Provide structured, concise, and factual information about the career role '{career_name}'.
 
         Return ONLY valid JSON in this format:
         {{
           "title": "Software Engineer",
-          "description": "Software Engineers design, develop, and maintain software applications...",
+          "description": "Software Engineers design, build, and maintain software systems...",
           "skills": ["Programming", "Problem Solving", "Version Control"],
-          "responsibilities": ["Develop software", "Collaborate with teams", "Debug and optimize code"],
-          "education": "Bachelor’s degree in Computer Science or equivalent experience",
-          "salary": "Typical range depends on region and experience",
-          "outlook": "High demand across technology industries"
+          "responsibilities": ["Develop software", "Collaborate with teams", "Optimize performance"],
+          "education": "Bachelor’s degree in Computer Science or related field",
+          "salary": "Depends on region and experience",
+          "outlook": "High demand across industries"
         }}
         """
         try:
             response = llm.invoke(prompt)
             data = json.loads(response)
         except json.JSONDecodeError:
-            print("⚠️ LLaMA output not JSON — using fallback structure.")
-            data = {
-                "title": career_name,
-                "description": response.strip()[:500],
-                "skills": ["Analytical Thinking", "Team Collaboration"],
-                "responsibilities": ["Perform duties relevant to the field"],
-                "education": "Relevant degree or certification",
-                "salary": "Depends on experience",
-                "outlook": "Positive"
-            }
+            print("⚠️ LLaMA output not JSON — using fallback.")
+            data = None
         except Exception as e:
-            print("⚠️ LLaMA error:", e)
+            print("⚠️ Error invoking LLaMA:", e)
             data = None
 
-    # 2️⃣ Fallback static data if no model available
+    # 2️⃣ Fallback structured data
     if not data:
         data = {
             "title": career_name,
-            "description": f"{career_name} is a dynamic role that requires technical skills, problem-solving ability, and adaptability in fast-paced environments.",
-            "skills": ["Problem Solving", "Communication", "Adaptability"],
-            "responsibilities": ["Work on practical projects", "Collaborate with teams", "Deliver impactful results"],
-            "education": "Bachelor’s degree or equivalent industry experience",
-            "salary": "Varies by region and seniority",
-            "outlook": "Strong career growth expected"
+            "description": f"{career_name} is a role that blends technical expertise, creativity, and problem-solving to deliver impactful outcomes.",
+            "skills": ["Analytical Thinking", "Communication", "Adaptability"],
+            "responsibilities": ["Work on projects", "Collaborate with teams", "Apply innovative solutions"],
+            "education": "Bachelor’s degree or equivalent practical experience",
+            "salary": "Varies by experience and company",
+            "outlook": "Promising career growth opportunities"
         }
 
-    # 3️⃣ Beautiful formatted HTML (matching roadmap style)
+    # 3️⃣ Match roadmap-style formatted HTML
     html = f"""
-    <div style='margin-bottom:20px;padding:15px;background:#f8f9fa;
-                border-left:5px solid #007bff;border-radius:8px;'>
-        <h4 style='color:#007bff;margin-bottom:8px;'>💼 {data['title']}</h4>
-        <p style='color:#333;margin-bottom:12px;'>{data['description']}</p>
+    <b>💼 Career Overview: {data['title']}</b><br><br>
+    <div style='margin-bottom:15px;padding:12px;background:#f8f9fa;
+                border-left:5px solid #007bff;border-radius:6px;'>
+        <p style='color:#333;margin-bottom:10px;'>{data['description']}</p>
 
-        <div style='margin-top:10px;'>
-            <h6 style='color:#0056b3;'>🔧 Key Skills</h6>
-            <ul style='margin-left:20px;margin-bottom:10px;'>
-                {''.join(f"<li>{s}</li>" for s in data.get('skills', []))}
-            </ul>
+        <span style='color:#0056b3;'><b>🔧 Key Skills:</b></span>
+        <ul style='margin-top:6px;margin-bottom:10px;'>
+            {''.join(f"<li>{s}</li>" for s in data.get('skills', []))}
+        </ul>
 
-            <h6 style='color:#0056b3;'>📋 Responsibilities</h6>
-            <ul style='margin-left:20px;margin-bottom:10px;'>
-                {''.join(f"<li>{r}</li>" for r in data.get('responsibilities', []))}
-            </ul>
+        <span style='color:#0056b3;'><b>📋 Responsibilities:</b></span>
+        <ul style='margin-top:6px;margin-bottom:10px;'>
+            {''.join(f"<li>{r}</li>" for r in data.get('responsibilities', []))}
+        </ul>
 
-            <h6 style='color:#0056b3;'>🎓 Education</h6>
-            <p style='margin-left:10px;'>{data.get('education', '')}</p>
+        <span style='color:#0056b3;'><b>🎓 Education:</b></span>
+        <p style='margin-left:10px;margin-bottom:10px;'>{data.get('education', '')}</p>
 
-            <h6 style='color:#0056b3;'>💰 Salary</h6>
-            <p style='margin-left:10px;'>{data.get('salary', '')}</p>
+        <span style='color:#0056b3;'><b>💰 Salary:</b></span>
+        <p style='margin-left:10px;margin-bottom:10px;'>{data.get('salary', '')}</p>
 
-            <h6 style='color:#0056b3;'>📈 Outlook</h6>
-            <p style='margin-left:10px;'>{data.get('outlook', '')}</p>
-        </div>
+        <span style='color:#0056b3;'><b>📈 Outlook:</b></span>
+        <p style='margin-left:10px;margin-bottom:0;'>{data.get('outlook', '')}</p>
     </div>
     """
 
     return Markup(html)
+
+
+# 🧩 Local test
+if __name__ == "__main__":
+    html = get_career_info("Full Stack Developer")
+    print(html)
