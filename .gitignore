@@ -77,3 +77,6 @@ user_code.out
 
 # Data files
 user_scores.csv
+
+# Local configuration
+.local/
