@@ -144,44 +144,85 @@ def logout():
     return redirect(url_for("login"))
 
 
-# ==================== PROFILE ROUTE ====================
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
     if "user" not in session:
         return redirect(url_for("login"))
 
     username = session["user"]
-    user_data = users_collection.find_one({"username": username}, {"_id": 0})
+
+    # Ensure user document exists
+    user_data = users_collection.find_one({"username": username})
+    if not user_data:
+        users_collection.insert_one({
+            "username": username,
+            "marksheets": [],
+            "assessments": []
+        })
+        user_data = {"username": username, "marksheets": [], "assessments": []}
+
     assessments = user_data.get("assessments", [])
+
     if request.method == "POST":
         file = request.files.get("file")
         if not file or file.filename == "":
             flash("⚠️ No file selected!")
             return redirect(request.url)
 
-        if allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            file.save(filepath)
+        if not allowed_file(file.filename):
+            flash("⚠️ Please upload a valid PDF file!")
+            return redirect(request.url)
 
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(filepath)
+        print(f"📄 File saved to: {filepath}")
+
+        try:
             extracted_data = extract_marks_from_pdf(filepath)
-            users_collection.update_one(
-                {"username": username},
-                {"$push": {"marksheets": {
-                    "semester": extracted_data["semester"],
-                    "branch": extracted_data["branch"],
-                    "sgpa": extracted_data["sgpa"],
-                    "cgpa": extracted_data["cgpa"],
-                    "subjects": extracted_data["subjects"]
-                }}}
-            )
-            flash("✅ Marksheet processed successfully!")
-            return redirect(url_for("profile"))
-        else:
-            flash(" Please upload a valid PDF file!")
+            print("📊 Extracted Data:", extracted_data)
 
-    user_data = users_collection.find_one({"username": username}, {"_id": 0})
+            if not extracted_data or not extracted_data.get("subjects"):
+                flash("⚠️ Could not extract valid marks. Please upload a proper marksheet.")
+                return redirect(request.url)
+
+            # Manually update user_data for mock DB
+            new_marksheet = {
+                "semester": extracted_data.get("semester", "Unknown"),
+                "branch": extracted_data.get("branch", "CSE"),
+                "sgpa": extracted_data.get("sgpa", "N/A"),
+                "cgpa": extracted_data.get("cgpa", "N/A"),
+                "subjects": extracted_data.get("subjects", [])
+            }
+
+            # Add new entry to marksheets
+            user_data.setdefault("marksheets", []).append(new_marksheet)
+
+            # Update the collection
+            users_collection.update_one({"username": username}, {"$set": user_data})
+
+            flash("✅ Marksheet uploaded and processed successfully!")
+
+            # ✅ Render updated data directly
+            return render_template(
+                "profile.html",
+                user_data=user_data,
+                assessments=user_data.get("assessments", []),
+                user=username
+            )
+
+        except Exception as e:
+            print("❌ Error during PDF processing:", e)
+            flash(f"❌ Error: {e}")
+            return redirect(request.url)
+
+    # GET → show existing data
+    user_data = users_collection.find_one({"username": username}, {"_id": 0}) or {"marksheets": [], "assessments": []}
+    print(f"👤 Loaded User Data for {username}: {user_data}")
+    assessments = user_data.get("assessments", [])
+
     return render_template("profile.html", user_data=user_data, assessments=assessments, user=username)
+
 
 # ==================== UNIFIED CHAT (CAREER + MENTAL + TESTS) ====================
 from markupsafe import Markup
