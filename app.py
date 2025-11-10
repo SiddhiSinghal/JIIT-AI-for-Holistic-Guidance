@@ -29,7 +29,12 @@ from utils.skills import SKILL_LABELS
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
 from pymongo import MongoClient
-client = MongoClient("mongodb://localhost:27017/")
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+client = MongoClient(os.getenv("MONGO_URI"))
+
 
 db = client["holistic_guidance"]
 users_collection = db["users"]

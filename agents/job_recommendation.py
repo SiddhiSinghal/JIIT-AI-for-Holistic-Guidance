@@ -3,9 +3,17 @@ import pickle
 import pandas as pd
 from pymongo import MongoClient
 from flask import session
+import os
+from dotenv import load_dotenv
+from pymongo import MongoClient
 
+# Load environment variables
+load_dotenv()
+
+# Get the URI from .env file or Render environment
+MONGO_URI = os.getenv("MONGO_URI")
 # === Connect to MongoDB ===
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient(MONGO_URI)
 db = client["holistic_guidance"]
 users_collection = db["users"]
 
