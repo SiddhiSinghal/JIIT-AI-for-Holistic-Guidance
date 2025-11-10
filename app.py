@@ -33,7 +33,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-client = MongoClient(os.getenv("MONGO_URI"))
+#client = MongoClient(os.getenv("MONGO_URI"))
+client = MongoClient("mongodb://localhost:27017/")
 
 
 db = client["holistic_guidance"]

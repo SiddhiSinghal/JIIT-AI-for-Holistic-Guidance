@@ -17,7 +17,9 @@ MONGO_URI = os.getenv("MONGO_URI")
 def fetch_user_marks(username: str):
     """Fetch all marksheets for a user from MongoDB."""
     try:
-        client = MongoClient(MONGO_URI)
+        #client = MongoClient(MONGO_URI)
+        client = MongoClient("mongodb://localhost:27017/")
+
         db = client["holistic_guidance"]
         users_collection = db["users"]
 

@@ -12,8 +12,10 @@ load_dotenv()
 
 # Get the URI from .env file or Render environment
 MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient("mongodb://localhost:27017/")
+
 # === Connect to MongoDB ===
-client = MongoClient(MONGO_URI)
+#client = MongoClient(MONGO_URI)
 db = client["holistic_guidance"]
 users_collection = db["users"]
 
