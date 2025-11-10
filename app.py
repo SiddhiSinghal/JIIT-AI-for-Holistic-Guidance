@@ -11,6 +11,9 @@ from markupsafe import Markup
 import json
 import random
 from datetime import datetime
+from pymongo import MongoClient
+from dotenv import load_dotenv
+import os
 
 # ==== Import from utils for later integration ====
 from utils.ai_utils import (
@@ -28,17 +31,23 @@ from utils.skills import SKILL_LABELS
 # ==================== FLASK & MONGO SETUP ====================
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
-from pymongo import MongoClient
-import os
-from dotenv import load_dotenv
+
+
+# Load environment variables
 load_dotenv()
 
-#client = MongoClient(os.getenv("MONGO_URI"))
-client = MongoClient("mongodb://localhost:27017/")
+# Get MongoDB connection URI from .env
+MONGO_URI = os.getenv("MONGO_URI")
+
+try:
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
+    db = client["holistic_guidance"]
+    users_collection = db["users"]
+    print("✅ Connected to MongoDB Atlas successfully!")
+except Exception as e:
+    print("❌ Connection to MongoDB Atlas failed:", e)
 
 
-db = client["holistic_guidance"]
-users_collection = db["users"]
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
