@@ -12,7 +12,6 @@ requests==2.31.0
 
 # === Database ===
 pymongo==4.6.1
-psycopg2-binary==2.9.9
 
 # === Data Processing ===
 pandas==2.2.3
@@ -32,9 +31,6 @@ chromadb==0.5.3
 
 # === Visualization ===
 plotly==5.22.0
-
-# === Streamlit (optional interactive modules) ===
-streamlit==1.37.0
 
 # === Security ===
 bcrypt==4.1.2
