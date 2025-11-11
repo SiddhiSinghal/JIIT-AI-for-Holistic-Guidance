@@ -161,3 +161,53 @@ def generate_custom_roadmap(job_or_subject: str, topics: list, days: int = 30):
 
     html += "<br>✨ Stay consistent — follow each step with discipline!"
     return Markup(html)
+
+def get_roadmap_response(user_message: str, session):
+    """
+    Handles multi-turn roadmap conversation.
+    Returns either a follow-up question or the roadmap HTML.
+    """
+
+    # Detect what the user is talking about
+    context = detect_context(user_message)
+
+    # 1️⃣ If user says something like "roadmap for tech support"
+    if "roadmap" in user_message.lower():
+        match_role = re.search(r"(?:for|to become)\s+([a-zA-Z\s]+)", user_message.lower())
+        job_or_subject = match_role.group(1).strip().title() if match_role else "Your Goal"
+        session["roadmap_role"] = job_or_subject
+        session["roadmap_context"] = context
+        session["awaiting_days"] = True
+
+        return Markup(f"🗓️ Sure! How many days would you like your roadmap for <b>{job_or_subject}</b>?")
+
+    # 2️⃣ If user replies with number of days
+    elif session.get("awaiting_days"):
+        match_days = re.search(r"(\d+)", user_message)
+        if not match_days:
+            return Markup("⚠️ Please enter a valid number of days (e.g., 30 or 45).")
+
+        days = int(match_days.group(1))
+        session["roadmap_days"] = days
+        session.pop("awaiting_days", None)
+
+        # If it's a course, ask for syllabus next
+        if session.get("roadmap_context") == "course":
+            session["awaiting_topics"] = True
+            return Markup(f"🧾 Great! Please share the syllabus or main topics for <b>{session['roadmap_role']}</b>.")
+        else:
+            html = generate_custom_roadmap(session["roadmap_role"], ["Core Topics"], days)
+            session.clear()
+            return html
+
+    # 3️⃣ If user provides syllabus/topics
+    elif session.get("awaiting_topics"):
+        topics = [t.strip() for t in re.split(r"[,\n]", user_message) if t.strip()]
+        days = session.get("roadmap_days", 30)
+        job_or_subject = session.get("roadmap_role", "Your Goal")
+        session.clear()
+
+        html = generate_custom_roadmap(job_or_subject, topics, days)
+        return html
+
+    return None

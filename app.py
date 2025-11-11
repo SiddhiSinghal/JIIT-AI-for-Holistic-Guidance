@@ -361,53 +361,16 @@ def unified_chat():
     }
 
     # 🔹 Smart Roadmap Flow ---------------------------------------------------
-    if "roadmap" in user_message.lower():
-        # Extract job role and days if mentioned
-        match_days = re.search(r'(\d+)\s*(?:day|days|week|weeks)', user_message.lower())
-        match_role = re.search(r'roadmap.*for\s+([a-zA-Z\s]+)', user_message.lower())
+# 🔹 Smart Roadmap Flow (Simplified with state handling)
+    from agents.roadmap import get_roadmap_response
 
-        job_role = match_role.group(1).strip().title() if match_role else "Your Goal"
-        days = int(match_days.group(1)) if match_days else None
-
-        if days:
-            session["roadmap_days"] = days
-            session["roadmap_role"] = job_role
-            session["awaiting_topics"] = True
-            ai_text = f"Got it! You want a {days}-day roadmap for <b>{job_role}</b>. 🧠<br>Now tell me — what topics or syllabus areas should I focus on?"
-        else:
-            session["awaiting_roadmap_days"] = True
-            session["roadmap_role"] = job_role
-            ai_text = f"Sure! 📘 Let's plan your roadmap for <b>{job_role}</b>.<br>How many days do you want to complete it in?"
-
-        chat_history.append({"sender": "ai", "text": ai_text, "html": True})
+    roadmap_reply = get_roadmap_response(user_message, session)
+    if roadmap_reply:
+        ai_reply = {"sender": "ai", "text": str(roadmap_reply), "html": True}
+        chat_history.append(ai_reply)
         session["chat_history"] = chat_history[-12:]
         return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
 
-    # Step 2️⃣: User provides number of days
-    if session.get("awaiting_roadmap_days"):
-        try:
-            days = int(re.search(r'\d+', user_message).group())
-            session["roadmap_days"] = days
-            session.pop("awaiting_roadmap_days", None)
-            session["awaiting_topics"] = True
-            ai_text = f"Perfect! We'll build a roadmap for <b>{session.get('roadmap_role','your goal')}</b> in {days} days. ✨<br>Now please share your main topics or syllabus."
-        except:
-            ai_text = "⚠️ Please enter a valid number of days (like 30 or 45)."
-        chat_history.append({"sender": "ai", "text": ai_text, "html": True})
-        session["chat_history"] = chat_history[-12:]
-        return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
-
-    # Step 3️⃣: User provides topics
-    if session.get("awaiting_topics"):
-        topics = [t.strip() for t in user_message.split(",")]
-        days = session.get("roadmap_days", 30)
-        job_role = session.get("roadmap_role", "Your Goal")
-        session.pop("awaiting_topics", None)
-
-        html_response = generate_custom_roadmap(job_role, topics, days)
-        chat_history.append({"sender": "ai", "text": html_response, "html": True})
-        session["chat_history"] = chat_history[-12:]
-        return render_template("chat.html", user=username, chat_history=chat_history, chat_type="Unified")
 
     # 🔹 Mental Health Detection ----------------------------------------------
     if any(word in user_message.lower() for word in ["tired", "stressed", "sad", "depressed", "hopeless", "anxious", "lonely", "pressure", "done"]):
