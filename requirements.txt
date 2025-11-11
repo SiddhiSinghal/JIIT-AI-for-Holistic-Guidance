@@ -27,13 +27,13 @@ openai==1.29.0
 google-generativeai==0.3.2
 
 # === LangChain ecosystem (compatible with Python 3.11) ===
-langchain==0.2.7
-langchain-core==0.2.12
-langchain-community==0.2.7
+# === LangChain + Chroma + Ollama (Render-compatible) ===
+langchain==0.2.8
+langchain-core==0.2.25
+langchain-community==0.2.8
 langchain-chroma==0.1.1
-chromadb==0.5.0
-
 langchain-ollama==0.1.1
+chromadb==0.5.0
 
 
 # === Visualization ===
