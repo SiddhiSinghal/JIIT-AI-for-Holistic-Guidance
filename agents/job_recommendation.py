@@ -144,14 +144,6 @@ def get_job_recommendation_message(username):
         <div style='padding:12px;margin:10px 0;background:white;
                     border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.1);'>
             <b style='color:#212529;'>{i}. {job}</b><br>
-            <span style='color:#555;'>🧭 Explore further:</span><br>
-            <a href='/chat?mode=career&role={job}' target='_blank'
-               style='color:#007bff;text-decoration:none;font-size:14px;'>
-               🔹 Career Info</a> |
-            <a href='/chat?mode=roadmap&role={job}' target='_blank'
-               style='color:#28a745;text-decoration:none;font-size:14px;'>
-               🚀 Roadmap
-            </a>
         </div>
         """
 
