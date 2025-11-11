@@ -43,7 +43,7 @@ def classify_prompt(prompt: str) -> str:
         "my top job", "find job", "career path"
     ]
 
-    if any(k in prompt for k in ["take test", "start test", "i want to take", "give me the test", "start the", "take the"]):
+    if any(k in prompt for k in ["take test", "start test", "i want to take", "give me the test", "start the", "take the","test","test for me"]):
         if "aptitude" in prompt:
             return "test:aptitude"
         if "communication" in prompt or "communicat" in prompt:

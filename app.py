@@ -367,51 +367,62 @@ def unified_chat():
         ai_reply = get_mental_health_response(user_message)
 
     # 🔹 Test Detection --------------------------------------------------------
-    elif re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower()):
+ # 🔹 Detect Test-related Intents --------------------------------------------------------
+    elif (
+        re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower())
+        or any(k in user_message.lower() for k in ["aptitude", "communication", "creativity", "coding"])
+    ):
         test_map = {
             "aptitude": "/aptitude_test",
             "communication": "/communication_test",
             "creativity": "/creativity_test",
             "coding": "/coding_test"
         }
-        selected_test = None
-        for key in test_map.keys():
-            if key in user_message.lower():
-                selected_test = key
-                break
 
-        if not selected_test:
-            ai_reply = {
-                "sender": "ai",
-                "text": """
-                Which test would you like to take? 💡<br>
-                👉 Aptitude<br>👉 Communication<br>👉 Creativity<br>👉 Coding
-                """,
-                "html": True
-            }
-            session["test_intent"] = True
-        else:
-            test_url = test_map[selected_test]
-            ai_reply = {
-                "sender": "ai",
-                "html": True,
-                "text": f"""
-                <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
-                  🚀 Ready to begin your <b>{selected_test.capitalize()} Test</b>?<br><br>
-                  <a href='{test_url}' target='_blank'>
-                    <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
-                      Start Test
-                    </button>
-                  </a>
-                </div>
-                """
-            }
-            session["test_intent"] = False
+    selected_test = None
+    # Check which test the user mentioned
+    for key in test_map.keys():
+        if key in user_message.lower():
+            selected_test = key
+            break
 
-    # 🔹 Otherwise, fallback to orchestrator (career, linkedin, etc.)
-    else:
-        ai_reply = orchestrator_cli.orchestrate(user_message, username=username, last_user_message=user_message)
+    # Case 1️⃣: User directly mentioned test name (like "coding" or "aptitude")
+    if selected_test:
+        test_url = test_map[selected_test]
+        ai_reply = {
+            "sender": "ai",
+            "html": True,
+            "text": f"""
+            <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
+              🚀 Ready to begin your <b>{selected_test.capitalize()} Test</b>?<br><br>
+              <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
+                <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
+                  Start Test
+                </button>
+              </a>
+            </div>
+            """
+        }
         session["test_intent"] = False
+
+    # Case 2️⃣: User just said "start test" without naming which one
+    else:
+        ai_reply = {
+            "sender": "ai",
+            "html": True,
+            "text": """
+            <div style='padding:15px;background:#fff3cd;border-left:5px solid #ffc107;border-radius:8px;'>
+              Which test would you like to take? 💡<br><br>
+              👉 Aptitude<br>
+              👉 Communication<br>
+              👉 Creativity<br>
+              👉 Coding
+            </div>
+            """
+        }
+        session["test_intent"] = True
+
+
 
     # Append AI reply ---------------------------------------------------------
     if isinstance(ai_reply, dict):
