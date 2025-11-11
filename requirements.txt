@@ -22,14 +22,17 @@ openpyxl==3.1.5
 # === PDF Processing ===
 pymupdf==1.23.6
 
-# === AI & ML ===
+# === AI and Language Models ===
 openai==1.29.0
 google-generativeai==0.3.2
-langchain==0.1.20
-langchain-core==0.1.53
-langchain-community==0.0.38
-chromadb==0.4.22
-langchain-chroma==0.0.9
+
+# === LangChain ecosystem (compatible with Python 3.11) ===
+langchain==0.2.7
+langchain-core==0.2.12
+langchain-community==0.2.7
+langchain-chroma==0.1.1
+chromadb==0.5.0
+
 
 
 # === Visualization ===
