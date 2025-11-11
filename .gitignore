@@ -1,5 +1,4 @@
 # Python
-__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -21,6 +20,9 @@ wheels/
 *.egg
 MANIFEST
 *.pyc
+__pycache__/
+uploads/
+
 
 # Virtual environments
 venv/

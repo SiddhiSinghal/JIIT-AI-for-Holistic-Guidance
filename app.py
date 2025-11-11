@@ -366,7 +366,6 @@ def unified_chat():
         from summer_project.rag_chain import get_mental_health_response
         ai_reply = get_mental_health_response(user_message)
 
-    # 🔹 Test Detection --------------------------------------------------------
  # 🔹 Detect Test-related Intents --------------------------------------------------------
     elif (
         re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower())
@@ -617,4 +616,4 @@ def coding_test():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
