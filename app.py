@@ -262,7 +262,7 @@ def unified_chat():
         welcome_messages = {
             "career": """
                 <div style='padding:15px;background:#e8f4fd;border-left:5px solid #2196f3;border-radius:10px;'>
-                  <b>💼 Career Guidance Assistant</b><br><br>
+                  <b>💼 Career Advisory Module</b><br><br>
                   Welcome! I'm here to help you explore career opportunities, understand different professions, 
                   and guide you toward the right career path based on your skills and interests.<br><br>
                   Ask me about career options, job roles, industry trends, or career advice!
@@ -270,7 +270,7 @@ def unified_chat():
             """,
             "health_guidance": """
                 <div style='padding:15px;background:#fef5e7;border-left:5px solid #f39c12;border-radius:10px;'>
-                  <b>❤️ Health Guidance Support</b><br><br>
+                  <b>❤️ Wellbeing Guidance Module</b><br><br>
                   I'm here to provide a supportive space for you. Whether you're feeling stressed, anxious, 
                   or just need someone to talk to, I'm here to listen and offer guidance.<br><br>
                   Remember: Your health and wellbeing matter, and it's okay to ask for help.
@@ -278,7 +278,7 @@ def unified_chat():
             """,
             "linkedin": """
                 <div style='padding:15px;background:#e3f2fd;border-left:5px solid #0077b5;border-radius:10px;'>
-                  <b>✍️ LinkedIn Post Generator</b><br><br>
+                  <b>✍️ LinkedIn Content Generation Module</b><br><br>
                   Let's create engaging LinkedIn content! I can help you craft professional posts about your 
                   achievements, insights, or any topic you'd like to share with your network.<br><br>
                   Tell me what you'd like to write about, and I'll generate a polished LinkedIn post for you!
@@ -287,10 +287,45 @@ def unified_chat():
             "jobs": """
                 <div style='padding:15px;background:#e8f5e9;border-left:5px solid #4caf50;border-radius:10px;'>
                   <b>💼 Job Recommendations</b><br><br>
-                  I'll analyze your profile and suggest job roles that match your skills and interests.<br><br>
+                  I'll analyze your profile and suggest job roles that match your skills and interests. 
+                  Get personalized job recommendations based on your academic performance and strengths.<br><br>
                   Ask me for job suggestions or tell me about your career interests!
                 </div>
             """,
+            "mooc": """
+                <div style='padding:15px;background:#fff3e0;border-left:5px solid #ff9800;border-radius:10px;'>
+                  <b>📚 MOOC Course Recommendations</b><br><br>
+                  Looking to upskill? I can help you find the best online courses from platforms like 
+                  Coursera, edX, Udemy, and more, tailored to your interests and career goals.<br><br>
+                  Tell me what skills you want to learn!
+                </div>
+            """,
+            "electives": """
+                <div style='padding:15px;background:#f3e5f5;border-left:5px solid #9c27b0;border-radius:10px;'>
+                  <b>🎓 Elective Recommendations</b><br><br>
+                  Choosing the right electives can shape your career path! I'll help you select subjects 
+                  that align with your interests, strengths, and future goals.<br><br>
+                  Tell me about your semester or interests, and I'll suggest the best electives!
+                </div>
+            """,
+            "market_score": """
+                <div style='padding:15px;background:#fce4ec;border-left:5px solid #e91e63;border-radius:10px;'>
+                  <b>📊 Market Score Analysis</b><br><br>
+                  Understand the market demand for different subjects and skills! I'll provide insights 
+                  into which areas are trending and have strong job prospects.<br><br>
+                  Ask me about market demand for any subject or technology!
+                </div>
+            """
+        }
+        
+        chat_type_names = {
+            "career": "Career Guidance",
+            "health_guidance": "Health Guidance",
+            "linkedin": "LinkedIn Post Generator",
+            "jobs": "Job Recommendations",
+            "mooc": "MOOC Courses",
+            "electives": "Elective Suggestions",
+            "market_score": "Market Analysis"
         }
 
         welcome_message = welcome_messages.get(mode, """
@@ -311,6 +346,19 @@ def unified_chat():
     user_message = request.form["prompt"].strip()
     chat_history.append({"sender": "user", "text": user_message})
     ai_reply = None
+    test_keywords = ("aptitude", "communication", "creativity", "coding")
+    test_routes = {
+        "aptitude": "/aptitude_test",
+        "communication": "/communication_test",
+        "creativity": "/creativity_test",
+        "coding": "/coding_test",
+    }
+    test_titles = {
+        "aptitude": "Aptitude Assessment",
+        "communication": "Communication Assessment",
+        "creativity": "Creativity Assessment",
+        "coding": "Coding Assessment",
+    }
 
     # 🔹 Smart Roadmap Flow ---------------------------------------------------
     if "roadmap" in user_message.lower():
@@ -366,62 +414,71 @@ def unified_chat():
         from summer_project.rag_chain import get_mental_health_response
         ai_reply = get_mental_health_response(user_message)
 
- # 🔹 Detect Test-related Intents --------------------------------------------------------
+    # 🔹 Detect Test-related Intents --------------------------------------------------------
     elif (
         re.search(r"\b(take|start|begin|attempt|give).*\btest\b", user_message.lower())
-        or any(k in user_message.lower() for k in ["aptitude", "communication", "creativity", "coding"])
+        or any(k in user_message.lower() for k in test_keywords)
     ):
-        test_map = {
-            "aptitude": "/aptitude_test",
-            "communication": "/communication_test",
-            "creativity": "/creativity_test",
-            "coding": "/coding_test"
-        }
+        selected_test = next((k for k in test_keywords if k in user_message.lower()), None)
+        if selected_test:
+            test_url = test_routes[selected_test]
+            ai_reply = {
+                "sender": "ai",
+                "html": True,
+                "text": f"""
+                <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
+                  🚀 Ready to begin your <b>{test_titles[selected_test]}</b>?<br><br>
+                  <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
+                    <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
+                      Start Test
+                    </button>
+                  </a>
+                </div>
+                """,
+            }
+            session["test_intent"] = False
+        else:
+            ai_reply = {
+                "sender": "ai",
+                "text": """
+                Which test would you like to take? 💡<br>
+                You can choose one of the following:<br>
+                👉 Aptitude<br>
+                👉 Communication<br>
+                👉 Creativity<br>
+                👉 Coding
+                """,
+                "html": True,
+            }
+            session["test_intent"] = True
 
-    selected_test = None
-    # Check which test the user mentioned
-    for key in test_map.keys():
-        if key in user_message.lower():
-            selected_test = key
-            break
+    # 🔹 If user had previously said “start test” but now gives the type name only
+    elif session.get("test_intent") and any(k in user_message.lower() for k in test_keywords):
+        selected_test = next((k for k in test_keywords if k in user_message.lower()), None)
+        if selected_test:
+            test_url = test_routes[selected_test]
+            ai_reply = {
+                "sender": "ai",
+                "html": True,
+                "text": f"""
+                <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
+                  🚀 Ready to begin your <b>{test_titles[selected_test]}</b>?<br><br>
+                  <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
+                    <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
+                      Start Test
+                    </button>
+                  </a>
+                </div>
+                """,
+            }
+            session["test_intent"] = False
 
-    # Case 1️⃣: User directly mentioned test name (like "coding" or "aptitude")
-    if selected_test:
-        test_url = test_map[selected_test]
-        ai_reply = {
-            "sender": "ai",
-            "html": True,
-            "text": f"""
-            <div style='padding:15px;background:#e3f2fd;border-left:5px solid #2196f3;border-radius:8px;'>
-              🚀 Ready to begin your <b>{selected_test.capitalize()} Test</b>?<br><br>
-              <a href='{test_url}' target='_blank' rel='noopener noreferrer'>
-                <button style='background:#007bff;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;'>
-                  Start Test
-                </button>
-              </a>
-            </div>
-            """
-        }
-        session["test_intent"] = False
-
-    # Case 2️⃣: User just said "start test" without naming which one
-    else:
-        ai_reply = {
-            "sender": "ai",
-            "html": True,
-            "text": """
-            <div style='padding:15px;background:#fff3cd;border-left:5px solid #ffc107;border-radius:8px;'>
-              Which test would you like to take? 💡<br><br>
-              👉 Aptitude<br>
-              👉 Communication<br>
-              👉 Creativity<br>
-              👉 Coding
-            </div>
-            """
-        }
-        session["test_intent"] = True
-
-
+    if ai_reply is None:
+        ai_reply = orchestrator_cli.orchestrate(
+            user_message,
+            username=username,
+            last_user_message=user_message,
+        )
 
     # Append AI reply ---------------------------------------------------------
     if isinstance(ai_reply, dict):
@@ -477,14 +534,14 @@ def aptitude_test():
         users_collection.update_one(
             {"username": username},
             {"$push": {"assessments": {
-                "type": "Aptitude Test",
+                "type": "Aptitude Assessment",
                 "score": score,
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }}}
         )
 
 
-        return render_template("test_done.html", test="Aptitude", score=score)
+        return render_template("test_done.html", test="Aptitude Assessment", score=score)
 
     # GET → show random 10 questions
     questions = load_questions()
@@ -506,13 +563,13 @@ def communication_test():
         users_collection.update_one(
             {"username": username},
             {"$push": {"assessments": {
-                "type": "Communication Test",
+                "type": "Communication Assessment",
                 "score": score,
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }}}
         )
 
-        return render_template("test_done.html", test="Communication", score=score)
+        return render_template("test_done.html", test="Communication Assessment", score=score)
 
     return render_template("communication_test.html")
 
@@ -540,14 +597,14 @@ def creativity_test():
             {"username": username},
             {"$push": {
                 "assessments": {
-                    "type": "Creativity Test",
+                    "type": "Creativity Assessment",
                     "score": score,
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
             }}
         )
 
-        return render_template("test_done.html", test="Creativity", score=score)
+        return render_template("test_done.html", test="Creativity Assessment", score=score)
 
     prompt = random.choice(PROMPTS)
     return render_template("creativity_test.html", prompt=prompt)
@@ -603,14 +660,14 @@ def coding_test():
             {"username": username},
             {"$push": {
                 "assessments": {
-                    "type": "Coding Test",
+                    "type": "Coding Assessment",
                     "score": marks,
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
             }}
         )
 
-        return render_template("test_done.html", test="Coding", score=marks)
+        return render_template("test_done.html", test="Coding Assessment", score=marks)
 
     return render_template("coding_test.html", question=question)
 
