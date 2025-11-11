@@ -25,13 +25,18 @@ pymupdf==1.23.6
 # === AI & ML ===
 openai==1.29.0
 google-generativeai==0.3.2
-langchain==0.2.7
-langchain-community==0.2.7
+langchain==0.1.20
+langchain-core==0.1.53
+langchain-community==0.0.38
 chromadb==0.4.22
-langchain-chroma==0.1.0
+langchain-chroma==0.0.9
+
 
 # === Visualization ===
 plotly==5.22.0
 
 # === Security ===
 bcrypt==4.1.2
+pip==25.3
+setuptools>=68.0.0
+wheel>=0.41.0
