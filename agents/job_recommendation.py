@@ -107,3 +107,59 @@ def recommend_jobs(username):
         top_3_jobs = encoder.inverse_transform(pred).tolist()
 
     return top_3_jobs
+
+from markupsafe import Markup
+
+def get_job_recommendation_message(username):
+    """
+    Returns a well-formatted HTML message showing top job roles for the user.
+    """
+    jobs = recommend_jobs(username)
+
+    # ⚠️ Handle case where marksheet or model data is missing
+    if not jobs or "marksheet" in jobs[0].lower():
+        return Markup("""
+        <div style='padding:15px;background:#fff8e1;border-left:5px solid #ffc107;
+                    border-radius:10px;margin-bottom:10px;'>
+            ⚠️ <b>Upload Required:</b><br>
+            I couldn't find your marksheet data.<br>
+            Please upload it in your <b>Profile section</b> so I can analyze your scores and
+            recommend the best career paths for you! 📄✨
+        </div>
+        """)
+
+    # ✅ Nicely formatted job recommendation block
+    html = f"""
+    <div style='padding:15px;background:#f1f8ff;border-left:6px solid #007bff;
+                border-radius:12px;margin-bottom:15px;'>
+        <h4 style='color:#007bff;margin-bottom:8px;'>💼 Based on your academic performance,</h4>
+        <p style='color:#333;font-size:15px;margin-bottom:12px;'>
+            Here are the <b>Top Job Roles</b> that align with your skills and subject strengths:
+        </p>
+    """
+
+    # Add each job role as a card
+    for i, job in enumerate(jobs, start=1):
+        html += f"""
+        <div style='padding:12px;margin:10px 0;background:white;
+                    border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.1);'>
+            <b style='color:#212529;'>{i}. {job}</b><br>
+            <span style='color:#555;'>🧭 Explore further:</span><br>
+            <a href='/chat?mode=career&role={job}' target='_blank'
+               style='color:#007bff;text-decoration:none;font-size:14px;'>
+               🔹 Career Info</a> |
+            <a href='/chat?mode=roadmap&role={job}' target='_blank'
+               style='color:#28a745;text-decoration:none;font-size:14px;'>
+               🚀 Roadmap
+            </a>
+        </div>
+        """
+
+    html += """
+        <p style='margin-top:15px;color:#444;font-size:14px;'>
+            🌟 Stay consistent — focus on the skills linked to these roles to build a strong career foundation.
+        </p>
+    </div>
+    """
+
+    return Markup(html)

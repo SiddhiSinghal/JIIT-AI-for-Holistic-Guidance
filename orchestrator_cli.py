@@ -146,18 +146,22 @@ def run_non_llm_agent(agent_key: str, username=None, last_user_message=None):
     """Run non-LLM ML-based agents (job, subject, skills, etc.)."""
     # ---------------- JOB RECOMMENDATION ----------------
     if agent_key == "job":
-        from agents.job_recommendation import recommend_jobs
+        from agents.job_recommendation import get_job_recommendation_message
         username = username or "Guest"
         print(f"🚀 Running job recommendation for {username}...")
-        jobs = recommend_jobs(username)
-    
-        if isinstance(jobs, list):
-            html = "<b>💼 Top Job Recommendations for You:</b><br><ul>"
-            for j in jobs:
-                html += f"<li>{j}</li>"
-            html += "</ul>"
+
+        try:
+            html = get_job_recommendation_message(username)
             return Markup(html)
-        return str(jobs)
+        except Exception as e:
+            print("❌ Job recommendation failed:", e)
+            return Markup(f"""
+            <div style='padding:10px;background:#f8d7da;border-left:5px solid #dc3545;border-radius:6px;'>
+                ⚠️ Sorry, I couldn’t fetch your job recommendations.<br>
+                Error: {e}
+            </div>
+            """)
+
 
 
     elif agent_key == "skills":
