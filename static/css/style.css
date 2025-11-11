@@ -241,29 +241,29 @@ body {
   box-shadow: var(--shadow-lg);
   overflow-y: auto;
   z-index: 900;
-  padding: 1.5rem 1rem;
+  padding: 1rem 0.75rem;
   border-right: 2px solid var(--jiit-border);
 }
 
 .side-panel-title {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--jiit-primary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   padding: 0 0.5rem;
 }
 
 .panel-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .panel-nav-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
   border-radius: 0.75rem;
   text-decoration: none;
   color: var(--jiit-dark);
@@ -284,14 +284,15 @@ body {
 }
 
 .panel-icon {
-  font-size: 1.5rem;
-  width: 32px;
+  font-size: 1.1rem;
+  width: 24px;
   text-align: center;
 }
 
 .panel-label {
   flex: 1;
-  font-size: 0.95rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
 }
 
 .main-content {
