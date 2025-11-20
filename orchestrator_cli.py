@@ -38,9 +38,9 @@ def classify_prompt(prompt: str) -> str:
     job_keywords = [
         "job", "jobs", "recommendation", "recommendations",
         "top job", "top jobs", "best job",
-        "best career", "suggest job", "suggest me job",
-        "career prediction", "which job", "job role",
-        "my top job", "find job", "career path"
+        "suggest job", "suggest me job",
+        "which job", "job role",
+        "my top job", "find job"
     ]
 
     if any(k in prompt for k in ["take test", "start test", "i want to take", "give me the test", "start the", "take the","test","test for me"]):
@@ -60,11 +60,11 @@ def classify_prompt(prompt: str) -> str:
         return "job"
 
     # 🔹 Career exploration
-    if any(k in prompt for k in ["career", "profession", "scope", "salary","about","about career"]):
+    if any(k in prompt for k in ["career", "profession", "scope", "salary","about","about career","career path"]):
         return "career"
 
     # 🔹 Roadmap
-    elif any(k in prompt for k in ["roadmap", "steps", "plan", "path"]):
+    elif any(k in prompt for k in ["roadmap", "steps", "plan", "path","Plan","Path","Steps","steps to","road map","step-by-step","step by step"]):
         return "roadmap"
 
     # 🔹 LinkedIn Post
