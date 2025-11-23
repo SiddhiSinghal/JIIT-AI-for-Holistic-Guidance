@@ -167,8 +167,19 @@ def run_non_llm_agent(agent_key: str, username=None, last_user_message=None):
     elif agent_key == "skills":
         from agents.skill_profiler_agent import run_skill_profiler
         print("🎯 Running Skill Profiler...")
-        profile = run_skill_profiler(username, "data/subjects.xlsx")
-        return "✅ Skill profiler completed successfully."
+
+        result = run_skill_profiler(username, "data/subjects.xlsx")
+        graph_html = result.get("graph_html", "")
+
+        return Markup(f"""
+        <div style='padding:15px;background:#f1f8ff;border-left:5px solid #2196f3;border-radius:8px;'>
+            <h3>📊 Your Skill Profile</h3>
+            <p>Based on your uploaded marksheets.</p>
+            {graph_html}
+        </div>
+        """)
+
+
 
     elif agent_key == "market":
         from agents.market_score_agent import MarketScoreAgent
